@@ -23,7 +23,9 @@ set(
     "--leak-check=full --gen-suppressions=all --error-exitcode=1 --suppressions=${PROJECT_SOURCE_DIR}/scripts/valgrind.sup"
 )
 
+if(MBGL_OPTIONAL)
 include(CTest)
+endif()
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
