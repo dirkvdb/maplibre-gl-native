@@ -239,9 +239,9 @@ target_link_libraries(
         Qt${QT_VERSION_MAJOR}::Core
         Qt${QT_VERSION_MAJOR}::Gui
         Qt${QT_VERSION_MAJOR}::Network
+        $<BUILD_INTERFACE:mbgl-core>
     PRIVATE
         $<BUILD_INTERFACE:mbgl-compiler-options>
-        $<BUILD_INTERFACE:mbgl-core>
         $<BUILD_INTERFACE:mbgl-vendor-parsedate>
         $<BUILD_INTERFACE:mbgl-vendor-nunicode>
         $<BUILD_INTERFACE:mbgl-vendor-csscolorparser>
