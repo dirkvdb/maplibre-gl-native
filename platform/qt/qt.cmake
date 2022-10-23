@@ -12,6 +12,7 @@ option(MBGL_QT_WITH_HEADLESS "Build MapLibre GL Qt with headless support" ON)
 option(MBGL_QT_WITH_INTERNAL_SQLITE "Build MapLibre GL Qt bindings with internal sqlite" OFF)
 option(MBGL_QT_DEPLOYMENT "Autogenerate files necessary for deployment" OFF)
 
+find_package(ZLIB REQUIRED)
 find_package(QT NAMES Qt6 Qt5 COMPONENTS Core REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR}
              COMPONENTS Gui
@@ -26,7 +27,7 @@ if(NOT MBGL_QT_LIBRARY_ONLY)
 endif()
 
 if(NOT MBGL_QT_WITH_INTERNAL_SQLITE)
-    find_package(Qt${QT_VERSION_MAJOR}Sql REQUIRED)
+    find_package(sqlite3 CONFIG REQUIRED)
 else()
     message(STATUS "Using internal sqlite")
     include(${PROJECT_SOURCE_DIR}/vendor/sqlite.cmake)
@@ -94,7 +95,7 @@ target_sources(
         ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/storage/offline_database.cpp
         ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/storage/offline_download.cpp
         ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/storage/online_file_source.cpp
-        ${PROJECT_SOURCE_DIR}/platform/$<IF:$<BOOL:${MBGL_QT_WITH_INTERNAL_SQLITE}>,default/src/mbgl/storage/sqlite3.cpp,qt/src/mbgl/sqlite3.cpp>
+        ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/storage/sqlite3.cpp
         ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/util/compression.cpp
         ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/util/monotonic_timer.cpp
         $<$<BOOL:${MBGL_QT_WITH_HEADLESS}>:${PROJECT_SOURCE_DIR}/platform/qt/src/mbgl/headless_backend_qt.cpp>
@@ -142,22 +143,9 @@ target_link_libraries(
         Qt${QT_VERSION_MAJOR}::Core
         Qt${QT_VERSION_MAJOR}::Gui
         Qt${QT_VERSION_MAJOR}::Network
-        $<IF:$<BOOL:${MBGL_QT_WITH_INTERNAL_SQLITE}>,mbgl-vendor-sqlite,Qt${QT_VERSION_MAJOR}::Sql>
+        $<IF:$<BOOL:${MBGL_QT_WITH_INTERNAL_SQLITE}>,mbgl-vendor-sqlite,sqlite3>
         $<$<PLATFORM_ID:Linux>:$<IF:$<BOOL:${MBGL_QT_WITH_INTERNAL_ICU}>,mbgl-vendor-icu,ICU::uc>>
         mbgl-vendor-nunicode
-)
-
-set(qmaplibregl_headers
-    ${PROJECT_SOURCE_DIR}/platform/qt/include/QMapLibreGL/QMapLibreGL
-    ${PROJECT_SOURCE_DIR}/platform/qt/include/QMapLibreGL/export.hpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/include/QMapLibreGL/map.hpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/include/QMapLibreGL/Map
-    ${PROJECT_SOURCE_DIR}/platform/qt/include/QMapLibreGL/settings.hpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/include/QMapLibreGL/Settings
-    ${PROJECT_SOURCE_DIR}/platform/qt/include/QMapLibreGL/types.hpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/include/QMapLibreGL/Types
-    ${PROJECT_SOURCE_DIR}/platform/qt/include/QMapLibreGL/utils.hpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/include/QMapLibreGL/Utils
 )
 
 if (MBGL_QT_INSIDE_PLUGIN)
@@ -167,29 +155,6 @@ elseif(MBGL_QT_STATIC)
 else()
     add_library(qmaplibregl SHARED)
 endif()
-
-target_sources(
-    qmaplibregl
-    PRIVATE
-    ${qmaplibregl_headers}
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/map.cpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/map_p.hpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/settings.cpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/types.cpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/utils.cpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/utils/map_observer.cpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/utils/map_observer.hpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/utils/map_renderer.cpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/utils/map_renderer.hpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/utils/renderer_backend.cpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/utils/renderer_backend.hpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/utils/renderer_observer.hpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/utils/scheduler.cpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/utils/scheduler.hpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/utils/conversion.hpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/utils/geojson.cpp
-    ${PROJECT_SOURCE_DIR}/platform/qt/src/utils/geojson.hpp
-)
 
 # Linux/Mac: Set framework, version and headers
 set_target_properties(
@@ -286,8 +251,8 @@ if (MBGL_QT_STATIC AND NOT MBGL_QT_INSIDE_PLUGIN)
     target_link_libraries(
         qmaplibregl
         PUBLIC
-            $<$<NOT:$<BOOL:${MBGL_QT_WITH_INTERNAL_SQLITE}>>:Qt${QT_VERSION_MAJOR}::Sql>
-            $<$<NOT:$<OR:$<PLATFORM_ID:Windows>,$<PLATFORM_ID:Emscripten>>>:z>
+            $<$<NOT:$<BOOL:${MBGL_QT_WITH_INTERNAL_SQLITE}>>:sqlite3>
+            ZLIB::ZLIB
     )
 endif()
 
