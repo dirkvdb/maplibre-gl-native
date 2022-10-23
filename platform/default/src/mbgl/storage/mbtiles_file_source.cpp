@@ -20,11 +20,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#if defined(__QT__) && (defined(_WIN32) || defined(__EMSCRIPTEN__))
-#include <QtZlib/zlib.h>
-#else
 #include <zlib.h>
-#endif
 
 namespace {
 bool acceptsURL(const std::string& url) {
