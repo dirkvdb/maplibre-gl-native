@@ -1101,9 +1101,11 @@ else()
     message(FATAL_ERROR "Unsupported target platform: " ${CMAKE_SYSTEM_NAME})
 endif()
 
+if(MBGL_OPTIONAL)
 add_subdirectory(${PROJECT_SOURCE_DIR}/test)
 add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark)
 add_subdirectory(${PROJECT_SOURCE_DIR}/render-test)
+endif()
 
 if(EXISTS ${PROJECT_SOURCE_DIR}/internal/internal.cmake)
     include(${PROJECT_SOURCE_DIR}/internal/internal.cmake)
