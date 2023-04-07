@@ -135,6 +135,9 @@ include(GNUInstallDirs)
 include(${PROJECT_SOURCE_DIR}/vendor/nunicode.cmake)
 
 set_property(TARGET mbgl-core PROPERTY AUTOMOC ON)
+if (Qt6_FOUND AND COMMAND qt_enable_autogen_tool)
+    qt_enable_autogen_tool(mbgl-core "moc" ON)
+endif()
 
 target_link_libraries(
     mbgl-core
@@ -166,6 +169,9 @@ set_target_properties(
     SOVERSION ${MBGL_QT_VERSION_COMPATIBILITY}
     PUBLIC_HEADER "${qmaplibregl_headers}"
 )
+if (Qt6_FOUND AND COMMAND qt_enable_autogen_tool)
+    qt_enable_autogen_tool(qmaplibregl "moc" ON)
+endif()
 if (APPLE AND NOT MBGL_QT_STATIC AND NOT MBGL_QT_INSIDE_PLUGIN)
     set_target_properties(
         qmaplibregl PROPERTIES
@@ -324,6 +330,13 @@ if(NOT MBGL_QT_LIBRARY_ONLY)
         mbgl-test-runner
         PRIVATE WORK_DIRECTORY=${PROJECT_SOURCE_DIR}
     )
+
+    if(WIN32)
+        target_compile_definitions(
+            mbgl-test-runner
+            PRIVATE MBGL_BUILDING_LIB
+        )
+    endif()
 
     target_link_libraries(
         mbgl-test-runner

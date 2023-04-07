@@ -3,10 +3,10 @@
 #include <mbgl/util/event.hpp>
 
 #include <mbgl/util/noncopyable.hpp>
-#include <mbgl/util/optional.hpp>
 
 #include <memory>
 #include <string>
+#include <optional>
 
 namespace mbgl {
 
@@ -16,8 +16,8 @@ public:
     public:
         virtual ~Observer() = default;
 
-        // When an observer is set, this function will be called for every log
-        // message. Returning true will consume the message.
+        /// When an observer is set, this function will be called for every log
+        /// message. Returning true will consume the message.
         virtual bool onRecord(EventSeverity severity, Event event, int64_t code, const std::string &msg) = 0;
     };
 
@@ -75,13 +75,12 @@ private:
     static Log* get() noexcept;
 
     static void record(EventSeverity severity, Event event, const std::string &msg);
-    static void record(EventSeverity severity, Event event, const char* format = "", ...);
-    static void record(EventSeverity severity, Event event, int64_t code, const char* format = "", ...);
+    static void record(EventSeverity severity, Event event, int64_t code, const std::string &msg);
     static void record(EventSeverity severity,
                        Event event,
                        int64_t code,
                        const std::string& msg,
-                       const optional<std::string>& threadName);
+                       const std::optional<std::string>& threadName);
 
     // This method is the data sink that must be implemented by each platform we
     // support. It should ideally output the error message in a human readable

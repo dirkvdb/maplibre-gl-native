@@ -1,24 +1,24 @@
-if(NOT EXISTS ${PROJECT_SOURCE_DIR}/node_modules/@mapbox/cmake-node-module/module.cmake)
-    message(WARNING "Not building node bindings, dependencies not found. Run 'npm update'.")
-    return()
-endif()
-
+set(NODE_MODULE_MINIMUM_ABI 83) # Minimum supported Node.js version: 14
 set(NODE_MODULE_CACHE_DIR ${CMAKE_SOURCE_DIR}/build/headers)
-include(${PROJECT_SOURCE_DIR}/node_modules/@mapbox/cmake-node-module/module.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/module.cmake)
 
 add_node_module(
     mbgl-node
     INSTALL_PATH ${PROJECT_SOURCE_DIR}/lib/{node_abi}/mbgl.node
-    NAN_VERSION 2.14.2
+    NAN_VERSION 2.17.0
     EXCLUDE_NODE_ABIS
         46
         47
         48
         51
-        111
 )
-find_package(PkgConfig REQUIRED)
-pkg_search_module(LIBUV libuv REQUIRED)
+
+if(WIN32)
+    find_package(LIBUV REQUIRED)
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_search_module(LIBUV libuv REQUIRED)
+endif()
 
 add_library(mbgl-node-loop STATIC)
 

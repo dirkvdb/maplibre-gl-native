@@ -12,7 +12,7 @@ typedef NS_ENUM(NSInteger, MBXEmbeddedControl) {
 @interface MBXEmbeddedMapViewController () <UIScrollViewDelegate>
 
 @property (weak, nonatomic) IBOutlet UIScrollView *scrollView;
-@property (weak, nonatomic) IBOutlet MGLMapView *mapView;
+@property (weak, nonatomic) IBOutlet MLNMapView *mapView;
 
 @end
 
@@ -63,13 +63,13 @@ typedef NS_ENUM(NSInteger, MBXEmbeddedControl) {
     }
 }
 
-#pragma mark UIScrollViewDelegate methods
+// MARK: UIScrollViewDelegate methods
 
 - (UIView *)viewForZoomingInScrollView:(UIScrollView *)scrollView {
     return self.mapView;
 }
 
-#pragma mark Class method
+// MARK: Class method
 
 + (NSString *)titleForControl:(MBXEmbeddedControl) control {
     switch (control) {

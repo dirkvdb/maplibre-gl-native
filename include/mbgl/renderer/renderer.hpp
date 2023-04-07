@@ -22,27 +22,27 @@ class RendererBackend;
 } // namespace gfx
 
 struct PlacedSymbolData {
-    // Contents of the label
+    /// Contents of the label
     std::u16string key;
-    // If symbol contains text, text collision box in viewport coordinates
-    optional<mapbox::geometry::box<float>> textCollisionBox;
-    // If symbol contains icon, icon collision box in viewport coordinates
-    optional<mapbox::geometry::box<float>> iconCollisionBox;
-    // Symbol text was placed
+    /// If symbol contains text, text collision box in viewport coordinates
+    std::optional<mapbox::geometry::box<float>> textCollisionBox;
+    /// If symbol contains icon, icon collision box in viewport coordinates
+    std::optional<mapbox::geometry::box<float>> iconCollisionBox;
+    /// Symbol text was placed
     bool textPlaced;
-    // Symbol icon was placed
+    /// Symbol icon was placed
     bool iconPlaced;
-    // Symbol text or icon collision box intersects tile borders
+    /// Symbol text or icon collision box intersects tile borders
     bool intersectsTileBorder;
-    // Viewport padding ({viewportPadding, viewportPadding} is a coordinate of the tile's top-left corner)
+    /// Viewport padding ({viewportPadding, viewportPadding} is a coordinate of the tile's top-left corner)
     float viewportPadding;
-    // Layer id (leader of the symbol layout group)
+    /// Layer id (leader of the symbol layout group)
     std::string layer;
 };
 
 class Renderer {
 public:
-    Renderer(gfx::RendererBackend&, float pixelRatio_, const optional<std::string>& localFontFamily = {});
+    Renderer(gfx::RendererBackend&, float pixelRatio_, const std::optional<std::string>& localFontFamily = std::nullopt);
     ~Renderer();
 
     void markContextLost();
@@ -51,7 +51,7 @@ public:
 
     void render(const std::shared_ptr<UpdateParameters>&);
 
-    // Feature queries
+    /// Feature queries
     std::vector<Feature> queryRenderedFeatures(const ScreenLineString&, const RenderedQueryOptions& options = {}) const;
     std::vector<Feature> queryRenderedFeatures(const ScreenCoordinate& point, const RenderedQueryOptions& options = {}) const;
     std::vector<Feature> queryRenderedFeatures(const ScreenBox& box, const RenderedQueryOptions& options = {}) const;
@@ -60,25 +60,25 @@ public:
     AnnotationIDs queryShapeAnnotations(const ScreenBox& box) const;
     AnnotationIDs getAnnotationIDs(const std::vector<Feature>&) const;
 
-    // Feature extension query
+    /// Feature extension query
     FeatureExtensionValue queryFeatureExtensions(const std::string& sourceID,
                                                  const Feature& feature,
                                                  const std::string& extension,
                                                  const std::string& extensionField,
-                                                 const optional<std::map<std::string, Value>>& args = {}) const;
+                                                 const std::optional<std::map<std::string, Value>>& args = std::nullopt) const;
 
-    void setFeatureState(const std::string& sourceID, const optional<std::string>& sourceLayerID,
+    void setFeatureState(const std::string& sourceID, const std::optional<std::string>& sourceLayerID,
                          const std::string& featureID, const FeatureState& state);
 
     void getFeatureState(FeatureState& state,
                          const std::string& sourceID,
-                         const optional<std::string>& sourceLayerID,
+                         const std::optional<std::string>& sourceLayerID,
                          const std::string& featureID) const;
 
     void removeFeatureState(const std::string& sourceID,
-                            const optional<std::string>& sourceLayerID,
-                            const optional<std::string>& featureID,
-                            const optional<std::string>& stateKey);
+                            const std::optional<std::string>& sourceLayerID,
+                            const std::optional<std::string>& featureID,
+                            const std::optional<std::string>& stateKey);
 
     // Debug
     void dumpDebugLogs();

@@ -6,6 +6,7 @@
 #include <EGL/egl.h>
 
 #include <cassert>
+#include <sstream>
 
 namespace mbgl {
 namespace gl {
@@ -30,8 +31,8 @@ public:
         }
 
         if (!eglBindAPI(EGL_OPENGL_ES_API)) {
-            mbgl::Log::Error(mbgl::Event::OpenGL, "eglBindAPI(EGL_OPENGL_ES_API) returned error %d",
-                             eglGetError());
+            mbgl::Log::Error(mbgl::Event::OpenGL, "eglBindAPI(EGL_OPENGL_ES_API) returned error " +
+                             std::to_string(eglGetError()));
             throw std::runtime_error("eglBindAPI() failed");
         }
 
@@ -68,7 +69,7 @@ public:
     EGLConfig config = 0;
 };
 
-class EGLBackendImpl : public HeadlessBackend::Impl {
+class EGLBackendImpl final : public HeadlessBackend::Impl {
 public:
     EGLBackendImpl() {
         // EGL initializes the context client version to 1 by default. We want to
@@ -76,14 +77,16 @@ public:
         // objects and also to write vertex and fragment shaders in the OpenGL ES
         // Shading Language.
         const EGLint attribs[] = {
-            EGL_CONTEXT_CLIENT_VERSION, 2,
-            EGL_NONE
+                EGL_CONTEXT_CLIENT_VERSION, 2,
+                EGL_NONE
         };
 
         eglContext = eglCreateContext(eglDisplay->display, eglDisplay->config, EGL_NO_CONTEXT, attribs);
         if (eglContext == EGL_NO_CONTEXT) {
-            mbgl::Log::Error(mbgl::Event::OpenGL, "eglCreateContext() returned error 0x%04x",
-                             eglGetError());
+            std::ostringstream logMsg;
+            logMsg << "eglCreateContext() returned error 0x" << std::hex << eglGetError();
+            mbgl::Log::Error(mbgl::Event::OpenGL, logMsg.str());
+
             throw std::runtime_error("Error creating the EGL context object.\n");
         }
 

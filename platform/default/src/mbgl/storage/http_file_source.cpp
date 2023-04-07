@@ -6,7 +6,6 @@
 #include <mbgl/util/logging.hpp>
 
 #include <mbgl/util/util.hpp>
-#include <mbgl/util/optional.hpp>
 #include <mbgl/util/run_loop.hpp>
 #include <mbgl/util/string.hpp>
 #include <mbgl/util/timer.hpp>
@@ -21,6 +20,7 @@
 #include <cassert>
 #include <cstring>
 #include <cstdio>
+#include <optional>
 
 static void handleError(CURLMcode code) {
     if (code != CURLM_OK) {
@@ -96,8 +96,8 @@ private:
     std::shared_ptr<std::string> data;
     std::unique_ptr<Response> response;
 
-    optional<std::string> retryAfter;
-    optional<std::string> xRateLimitReset;
+    std::optional<std::string> retryAfter;
+    std::optional<std::string> xRateLimitReset;
 
     CURL *handle = nullptr;
     curl_slist *headers = nullptr;
@@ -194,18 +194,18 @@ int HTTPFileSource::Impl::handleSocket(CURL * /* handle */, curl_socket_t s, int
     switch (action) {
     case CURL_POLL_IN: {
         using namespace std::placeholders;
-        util::RunLoop::Get()->addWatch(s, util::RunLoop::Event::Read,
+        util::RunLoop::Get()->addWatch(static_cast<int>(s), util::RunLoop::Event::Read,
                 std::bind(&Impl::perform, context, _1, _2));
         break;
     }
     case CURL_POLL_OUT: {
         using namespace std::placeholders;
-        util::RunLoop::Get()->addWatch(s, util::RunLoop::Event::Write,
+        util::RunLoop::Get()->addWatch(static_cast<int>(s), util::RunLoop::Event::Write,
                 std::bind(&Impl::perform, context, _1, _2));
         break;
     }
     case CURL_POLL_REMOVE:
-        util::RunLoop::Get()->removeWatch(s);
+        util::RunLoop::Get()->removeWatch(static_cast<int>(s));
         break;
     default:
         throw std::runtime_error("Unhandled CURL socket action");
@@ -280,6 +280,11 @@ HTTPRequest::HTTPRequest(HTTPFileSource::Impl* context_, Resource resource_, Fil
         curl_easy_setopt(handle, CURLOPT_HTTPHEADER, headers);
     }
 
+#ifdef WIN32
+    // Windows has issues with TLSv1.3, so we limit to TLSv1.2. Should be resolved in a later cURL release
+    // https://github.com/curl/curl/issues/9431
+    handleError(curl_easy_setopt(handle, CURLOPT_SSLVERSION, CURL_SSLVERSION_MAX_TLSv1_2));
+#endif
     handleError(curl_easy_setopt(handle, CURLOPT_PRIVATE, this));
     handleError(curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, error));
     handleError(curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1));

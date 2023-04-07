@@ -5,6 +5,7 @@
 ### ✨ New features
 
 - *...Add new stuff here...*
+- [windows] Added windows build support for core applications and node [#707](https://github.com/maplibre/maplibre-gl-native/pull/707)
 - [core] Add `ClientOptions` to configure client information [#365](https://github.com/maplibre/maplibre-gl-native/pull/365).
 - [node] Add workflow to create node binary releases for Ubuntu 20.04 x64 and MacOS 12 x64/arm64 [#378](https://github.com/maplibre/maplibre-gl-native/pull/378), [#459](https://github.com/maplibre/maplibre-gl-native/pull/459).
 
@@ -24,6 +25,7 @@
 ### 🐞 Bug fixes
 
 - *...Add new stuff here...*
+- [core] Fix memory access violation exception in vector_tile_data.cpp [#632](https://github.com/maplibre/maplibre-gl-native/pull/632)
 - [iOS] Fix a bug where the compass was determined to be misplaced when hidden [#498](https://github.com/maplibre/maplibre-gl-native/pull/498).
 - [core] `MaptilerFileSource` renamed to `MBTilesFileSource` [#198](https://github.com/maplibre/maplibre-gl-native/pull/198).
 

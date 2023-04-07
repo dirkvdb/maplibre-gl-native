@@ -18,7 +18,7 @@ static std::string sprintf(const char *msg, Args... args) {
     return std::string(res, len);
 }
 
-const static bool png_version_check __attribute__((unused)) = []() {
+const static bool png_version_check [[maybe_unused]] = []() {
     const png_uint_32 version = png_access_version_number();
     if (version != PNG_LIBPNG_VER) {
         throw std::runtime_error(sprintf<96>(
@@ -36,7 +36,7 @@ static void user_error_fn(png_structp, png_const_charp error_msg) {
 }
 
 static void user_warning_fn(png_structp, png_const_charp warning_msg) {
-    Log::Warning(Event::Image, "ImageReader (PNG): %s", warning_msg);
+    Log::Warning(Event::Image, std::string("ImageReader (PNG): ") + warning_msg);
 }
 
 static void png_read_data(png_structp png_ptr, png_bytep data, png_size_t length) {

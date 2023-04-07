@@ -76,7 +76,7 @@ std::string simpleDiff(const Value& result, const Value& expected) {
             break;
         }
 
-        if (!deepEqual(resultTokens[i], expectedTokens[i])) {
+        if (resultTokens[i] != expectedTokens[i]) {
             diff << "<b>"
                  << "-" << expectedTokens[i] << "</b>" << std::endl;
             diff << "<b>"
@@ -246,7 +246,7 @@ void TestRunner::checkRenderTestResults(mbgl::PremultipliedImage&& actualImage, 
         }
 
         for (const auto& entry : expectedImagesPaths) {
-            mbgl::optional<std::string> maybeExpectedImage = mbgl::util::readFile(entry);
+            std::optional<std::string> maybeExpectedImage = mbgl::util::readFile(entry);
             if (!maybeExpectedImage) {
                 metadata.errorMessage = "Failed to load expected image " + entry;
                 metadata.renderErrored++;
@@ -257,13 +257,14 @@ void TestRunner::checkRenderTestResults(mbgl::PremultipliedImage&& actualImage, 
 
             expectedImage = mbgl::decodeImage(*maybeExpectedImage);
 
-            pixels = // implicitly converting from uint64_t
+            pixels = static_cast<double>(
                 mapbox::pixelmatch(actualImage.data.get(),
                                    expectedImage.data.get(),
                                    expectedImage.size.width,
                                    expectedImage.size.height,
                                    imageDiff.data.get(),
-                                   0.1285); // Defined in GL JS
+                                   0.1285) // Defined in GL JS
+            );
 
             metadata.diff = mbgl::encodePNG(imageDiff);
 
@@ -349,7 +350,7 @@ void TestRunner::checkProbingResults(TestMetadata& resultMetadata) {
                 return;
             }
 
-            auto result = checkValue(expected.second.size, actual->second.size, actual->second.tolerance);
+            auto result = checkValue(static_cast<float>(expected.second.size), static_cast<float>(actual->second.size), actual->second.tolerance);
             if (!std::get<bool>(result)) {
                 std::stringstream ss;
                 ss << "File size does not match at probe \"" << expected.first << "\" for file \""
@@ -628,7 +629,6 @@ TestOperations getAfterOperations(const Manifest& manifest) {
         }
         if (networkProbeOp == probe) {
             result.emplace_back([](TestContext& ctx) {
-                assert(ProxyFileSource::isTrackingActive());
                 ctx.getMetadata().metrics.network.emplace(
                     std::piecewise_construct,
                     std::forward_as_tuple(networkProbeOp + mark),
@@ -663,7 +663,7 @@ LatLng getTileCenterCoordinates(const UnwrappedTileID& tileId) {
 }
 
 uint32_t getTileScreenPixelSize(float pixelRatio) {
-    return util::tileSize_D * pixelRatio;
+    return static_cast<uint32_t>(util::tileSize_D * pixelRatio);
 }
 
 uint32_t getImageTileOffset(const std::set<uint32_t>& dims, uint32_t dim, float pixelRatio) {
@@ -757,7 +757,7 @@ void TestRunner::run(TestMetadata& metadata) {
     if (metadata.mapMode == MapMode::Tile) {
         assert(camera.zoom);
         assert(camera.center);
-        auto tileIds = util::tileCover(map.latLngBoundsForCamera(camera), *camera.zoom);
+        auto tileIds = util::tileCover(map.latLngBoundsForCamera(camera), static_cast<uint8_t>(*camera.zoom));
         assert(!tileIds.empty());
         std::set<uint32_t> xDims;
         std::set<uint32_t> yDims;
@@ -863,7 +863,9 @@ void TestRunner::run(TestMetadata& metadata) {
     }
 
     if (metadata.renderTest) {
-        checkProbingResults(metadata);
+        if (!metadata.ignoreProbing) {
+            checkProbingResults(metadata);
+        }
         appendLabelCutOffResults(metadata, cutOffLabelsReport, duplicationsReport);
         checkRenderTestResults(std::move(result.image), metadata);
     } else {

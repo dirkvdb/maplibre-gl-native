@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     const std::string asset_root = assetsValue ? args::get(assetsValue) : ".";
 
     // Try to load the apikey from the environment.
-    const char* apikeyEnv = getenv("MGL_API_KEY");
+    const char* apikeyEnv = getenv("MLN_API_KEY");
     const std::string apikey = apikeyValue ? args::get(apikeyValue) : (apikeyEnv ? apikeyEnv : std::string());
 
     const bool debug = debugFlag ? args::get(debugFlag) : false;
@@ -78,9 +78,9 @@ int main(int argc, char *argv[]) {
 
     util::RunLoop loop;
 
-    HeadlessFrontend frontend({ width, height }, pixelRatio);
+    HeadlessFrontend frontend({ width, height }, static_cast<float>(pixelRatio));
     Map map(frontend, MapObserver::nullObserver(),
-            MapOptions().withMapMode(MapMode::Static).withSize(frontend.getSize()).withPixelRatio(pixelRatio),
+            MapOptions().withMapMode(MapMode::Static).withSize(frontend.getSize()).withPixelRatio(static_cast<float>(pixelRatio)),
             ResourceOptions().withCachePath(cache_file).withAssetPath(asset_root).withApiKey(apikey).withTileServerOptions(mapTilerConfiguration));
 
     if (style.find("://") == std::string::npos) {

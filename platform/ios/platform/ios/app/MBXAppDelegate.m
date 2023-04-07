@@ -11,15 +11,15 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
-#ifndef MGL_DISABLE_LOGGING
-    [MGLLoggingConfiguration sharedConfiguration].loggingLevel = MGLLoggingLevelFault;
+#ifndef MLN_DISABLE_LOGGING
+    [MLNLoggingConfiguration sharedConfiguration].loggingLevel = MLNLoggingLevelFault;
 #endif
-    [MGLSettings useWellKnownTileServer:MGLMapTiler];
+    [MLNSettings useWellKnownTileServer:MLNMapTiler];
 
     return YES;
 }
 
-#pragma mark - Quick actions
+// MARK: - Quick actions
 
 - (void)application:(UIApplication *)application performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completionHandler:(void (^)(BOOL))completionHandler {
     completionHandler([self handleShortcut:shortcutItem]);

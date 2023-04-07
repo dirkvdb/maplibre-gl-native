@@ -17,7 +17,11 @@ namespace node_mbgl {
 Nan::Persistent<v8::Function> NodeExpression::constructor;
 
 void NodeExpression::Init(v8::Local<v8::Object> target) {
+#if defined NODE_MODULE_VERSION && NODE_MODULE_VERSION < 93
     v8::Local<v8::Context> context = target->CreationContext();
+#else
+    v8::Local<v8::Context> context = target->GetCreationContext().ToLocalChecked();
+#endif
     v8::Local<v8::FunctionTemplate> tpl = Nan::New<v8::FunctionTemplate>(New);
     tpl->SetClassName(Nan::New("Expression").ToLocalChecked());
     tpl->InstanceTemplate()->SetInternalFieldCount(1); // what is this doing?
@@ -50,9 +54,13 @@ type::Type parseType(v8::Local<v8::Object> type) {
     std::string kind(*v8::String::Utf8Value(v8::Isolate::GetCurrent(), v8kind));
 
     if (kind == "array") {
+#if defined NODE_MODULE_VERSION && NODE_MODULE_VERSION < 93
         v8::Local<v8::Context> context = type->CreationContext();
+#else
+        v8::Local<v8::Context> context = type->GetCreationContext().ToLocalChecked();
+#endif
         type::Type itemType = parseType(Nan::Get(type, Nan::New("itemType").ToLocalChecked()).ToLocalChecked()->ToObject(context).ToLocalChecked());
-        mbgl::optional<std::size_t> N;
+        std::optional<std::size_t> N;
 
         v8::Local<v8::String> Nkey = Nan::New("N").ToLocalChecked();
         if (Nan::Has(type, Nkey).FromMaybe(false)) {
@@ -72,16 +80,14 @@ void NodeExpression::Parse(const Nan::FunctionCallbackInfo<v8::Value>& info) {
         return Nan::ThrowTypeError("Requires a JSON style expression argument.");
     }
 
-    mbgl::optional<type::Type> expected;
+    std::optional<type::Type> expected;
     if (info.Length() > 1 && info[1]->IsObject()) {
         expected = parseType(info[1]->ToObject(context).ToLocalChecked());
     }
 
     auto success = [&cons, &info](std::unique_ptr<Expression> result) {
         auto nodeExpr = new NodeExpression(std::move(result));
-        const int argc = 0;
-        v8::Local<v8::Value> argv[0] = {};
-        auto wrapped = Nan::NewInstance(cons, argc, argv).ToLocalChecked();
+        auto wrapped = Nan::NewInstance(cons).ToLocalChecked();
         nodeExpr->Wrap(wrapped);
         info.GetReturnValue().Set(wrapped);
     };
@@ -241,17 +247,17 @@ void NodeExpression::Evaluate(const Nan::FunctionCallbackInfo<v8::Value>& info) 
         return Nan::ThrowTypeError("Requires globals and feature arguments.");
     }
 
-    mbgl::optional<float> zoom;
+    std::optional<float> zoom;
     v8::Local<v8::Value> v8zoom = Nan::Get(info[0]->ToObject(context).ToLocalChecked(), Nan::New("zoom").ToLocalChecked()).ToLocalChecked();
-    if (v8zoom->IsNumber()) zoom = Nan::To<double>(v8zoom).FromJust();
+    if (v8zoom->IsNumber()) zoom = static_cast<float>(Nan::To<double>(v8zoom).FromJust());
 
-    mbgl::optional<double> heatmapDensity;
+    std::optional<double> heatmapDensity;
     v8::Local<v8::Value> v8heatmapDensity = Nan::Get(info[0]->ToObject(context).ToLocalChecked(), Nan::New("heatmapDensity").ToLocalChecked()).ToLocalChecked();
     if (v8heatmapDensity->IsNumber()) heatmapDensity = Nan::To<double>(v8heatmapDensity).FromJust();
 
     Nan::JSON NanJSON;
     conversion::Error conversionError;
-    mbgl::optional<mbgl::GeoJSON> geoJSON = conversion::convert<mbgl::GeoJSON>(info[1], conversionError);
+    std::optional<mbgl::GeoJSON> geoJSON = conversion::convert<mbgl::GeoJSON>(info[1], conversionError);
     if (!geoJSON) {
         Nan::ThrowTypeError(conversionError.message.c_str());
         return;

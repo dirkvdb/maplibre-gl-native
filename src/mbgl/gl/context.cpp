@@ -24,13 +24,13 @@ using namespace platform;
 static_assert(underlying_type(ShaderType::Vertex) == GL_VERTEX_SHADER, "OpenGL type mismatch");
 static_assert(underlying_type(ShaderType::Fragment) == GL_FRAGMENT_SHADER, "OpenGL type mismatch");
 
-static_assert(std::is_same<ProgramID, GLuint>::value, "OpenGL type mismatch");
-static_assert(std::is_same<ShaderID, GLuint>::value, "OpenGL type mismatch");
-static_assert(std::is_same<BufferID, GLuint>::value, "OpenGL type mismatch");
-static_assert(std::is_same<TextureID, GLuint>::value, "OpenGL type mismatch");
-static_assert(std::is_same<VertexArrayID, GLuint>::value, "OpenGL type mismatch");
-static_assert(std::is_same<FramebufferID, GLuint>::value, "OpenGL type mismatch");
-static_assert(std::is_same<RenderbufferID, GLuint>::value, "OpenGL type mismatch");
+static_assert(std::is_same_v<ProgramID, GLuint>, "OpenGL type mismatch");
+static_assert(std::is_same_v<ShaderID, GLuint>, "OpenGL type mismatch");
+static_assert(std::is_same_v<BufferID, GLuint>, "OpenGL type mismatch");
+static_assert(std::is_same_v<TextureID, GLuint>, "OpenGL type mismatch");
+static_assert(std::is_same_v<VertexArrayID, GLuint>, "OpenGL type mismatch");
+static_assert(std::is_same_v<FramebufferID, GLuint>, "OpenGL type mismatch");
+static_assert(std::is_same_v<RenderbufferID, GLuint>, "OpenGL type mismatch");
 
 static_assert(underlying_type(UniformDataType::Float) == GL_FLOAT, "OpenGL type mismatch");
 static_assert(underlying_type(UniformDataType::FloatVec2) == GL_FLOAT_VEC2, "OpenGL type mismatch");
@@ -84,7 +84,7 @@ void Context::initializeExtensions(const std::function<gl::ProcAddress(const cha
 
         static const std::string renderer = []() {
             std::string r = reinterpret_cast<const char*>(MBGL_CHECK_ERROR(glGetString(GL_RENDERER)));
-            Log::Info(Event::General, "GPU Identifier: %s", r.c_str());
+            Log::Info(Event::General, "GPU Identifier: " + r);
             return r;
         }();
 
@@ -159,7 +159,7 @@ UniqueShader Context::createShader(ShaderType type, const std::initializer_list<
     if (logLength > 0) {
         const auto log = std::make_unique<GLchar[]>(logLength);
         MBGL_CHECK_ERROR(glGetShaderInfoLog(result, logLength, &logLength, log.get()));
-        Log::Error(Event::Shader, "Shader failed to compile: %s", log.get());
+        Log::Error(Event::Shader, std::string("Shader failed to compile: ") + log.get());
     }
 
     throw std::runtime_error("shader failed to compile");
@@ -199,7 +199,7 @@ void Context::verifyProgramLinkage(ProgramID program_) {
     const auto log = std::make_unique<GLchar[]>(logLength);
     if (logLength > 0) {
         MBGL_CHECK_ERROR(glGetProgramInfoLog(program_, logLength, &logLength, log.get()));
-        Log::Error(Event::Shader, "Program failed to link: %s", log.get());
+        Log::Error(Event::Shader, std::string("Program failed to link: ") + log.get());
     }
 
     throw std::runtime_error("program failed to link");
@@ -501,9 +501,9 @@ void Context::setDirtyState() {
     globalVertexArrayState.setDirty();
 }
 
-void Context::clear(optional<mbgl::Color> color,
-                    optional<float> depth,
-                    optional<int32_t> stencil) {
+void Context::clear(std::optional<mbgl::Color> color,
+                    std::optional<float> depth,
+                    std::optional<int32_t> stencil) {
     GLbitfield mask = 0;
 
     if (color) {

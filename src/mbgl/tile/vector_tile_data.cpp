@@ -1,5 +1,6 @@
 #include <mbgl/tile/vector_tile_data.hpp>
 #include <mbgl/util/constants.hpp>
+#include <mbgl/util/logging.hpp>
 
 namespace mbgl {
 
@@ -21,9 +22,9 @@ FeatureType VectorTileFeature::getType() const {
     }
 }
 
-optional<Value> VectorTileFeature::getValue(const std::string& key) const {
-    const optional<Value> value(feature.getValue(key));
-    return value->is<NullValue>() ? nullopt : value;
+std::optional<Value> VectorTileFeature::getValue(const std::string& key) const {
+    const std::optional<Value> value(feature.getValue(key));
+    return value->is<NullValue>() ? std::nullopt : value;
 }
 
 const PropertyMap& VectorTileFeature::getProperties() const {
@@ -40,7 +41,15 @@ FeatureIdentifier VectorTileFeature::getID() const {
 const GeometryCollection& VectorTileFeature::getGeometries() const {
     if (!lines) {
         const auto scale = static_cast<float>(util::EXTENT) / feature.getExtent();
-        lines = feature.getGeometries<GeometryCollection>(scale);
+
+        try {
+            lines = feature.getGeometries<GeometryCollection>(scale);
+        }
+        catch(const std::runtime_error& ex) {
+            Log::Error(Event::ParseTile, "Could not get geometries: " + std::string(ex.what()));
+            lines = GeometryCollection();
+        }
+
         if (feature.getVersion() < 2 && feature.getType() == mapbox::vector_tile::GeomType::POLYGON) {
             lines = fixupPolygons(*lines);
         }

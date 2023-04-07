@@ -35,10 +35,10 @@
 #import <netdb.h>
 
 
-NSString *const kMGLReachabilityChangedNotification = @"kMGLReachabilityChangedNotification";
+NSString *const kMLNReachabilityChangedNotification = @"kMLNReachabilityChangedNotification";
 
 
-@interface MGLReachability ()
+@interface MLNReachability ()
 
 @property (nonatomic, assign) SCNetworkReachabilityRef  reachabilityRef;
 @property (nonatomic, strong) dispatch_queue_t          reachabilitySerialQueue;
@@ -73,7 +73,7 @@ static void TMReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkRea
 {
 #pragma unused (target)
 
-    MGLReachability *reachability = ((__bridge MGLReachability*)info);
+    MLNReachability *reachability = ((__bridge MLNReachability*)info);
 
     // We probably don't need an autoreleasepool here, as GCD docs state each queue has its own autorelease pool,
     // but what the heck eh?
@@ -84,13 +84,13 @@ static void TMReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkRea
 }
 
 
-@implementation MGLReachability
+@implementation MLNReachability
 
-#pragma mark - Class Constructor Methods
+// MARK: - Class Constructor Methods
 
 +(instancetype)reachabilityWithHostName:(NSString*)hostname
 {
-    return [MGLReachability reachabilityWithHostname:hostname];
+    return [MLNReachability reachabilityWithHostname:hostname];
 }
 
 +(instancetype)reachabilityWithHostname:(NSString*)hostname
@@ -180,7 +180,7 @@ static void TMReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkRea
     _reachabilitySerialQueue = nil;
 }
 
-#pragma mark - Notifier Methods
+// MARK: - Notifier Methods
 
 // Notifier
 // NOTE: This uses GCD to trigger the blocks - they *WILL NOT* be called on THE MAIN THREAD
@@ -242,7 +242,7 @@ static void TMReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkRea
     self.reachabilityObject = nil;
 }
 
-#pragma mark - reachability tests
+// MARK: - reachability tests
 
 // This is for the case where you flick the airplane mode;
 // you end up getting something like this:
@@ -384,7 +384,7 @@ static void TMReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkRea
 }
 
 
-#pragma mark - reachability status stuff
+// MARK: - reachability status stuff
 
 -(NetworkStatus)currentReachabilityStatus
 {
@@ -435,7 +435,7 @@ static void TMReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkRea
     return reachabilityFlags([self reachabilityFlags]);
 }
 
-#pragma mark - Callback function calls this method
+// MARK: - Callback function calls this method
 
 -(void)reachabilityChanged:(SCNetworkReachabilityFlags)flags
 {
@@ -456,12 +456,12 @@ static void TMReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkRea
 
     // this makes sure the change notification happens on the MAIN THREAD
     dispatch_async(dispatch_get_main_queue(), ^{
-        [[NSNotificationCenter defaultCenter] postNotificationName:kMGLReachabilityChangedNotification
+        [[NSNotificationCenter defaultCenter] postNotificationName:kMLNReachabilityChangedNotification
                                                             object:self];
     });
 }
 
-#pragma mark - Debug Description
+// MARK: - Debug Description
 
 - (NSString *) description
 {

@@ -32,7 +32,7 @@ Map::Impl::~Impl() {
     rendererFrontend.reset();
 };
 
-#pragma mark - Map::Impl StyleObserver
+// MARK: - Map::Impl StyleObserver
 
 void Map::Impl::onSourceChanged(style::Source& source) {
     observer.onSourceChanged(source);
@@ -109,7 +109,7 @@ void Map::Impl::onStyleError(std::exception_ptr error) {
     observer.onDidFailLoadingMap(type, description);
 }
 
-#pragma mark - Map::Impl RendererObserver
+// MARK: - Map::Impl RendererObserver
 
 void Map::Impl::onInvalidate() {
     onUpdate();
@@ -180,6 +180,10 @@ void Map::Impl::onRemoveUnusedStyleImages(const std::vector<std::string>& unused
             style->removeImage(unusedImageID);
         }
     }
+}
+
+void Map::Impl::onRegisterShaders(gfx::ShaderRegistry& registry) {
+    observer.onRegisterShaders(registry);
 }
 
 } // namespace mbgl

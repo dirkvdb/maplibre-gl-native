@@ -6,6 +6,10 @@
 #include "metadata.hpp"
 #include "runner.hpp"
 
+#if defined(WIN32) && defined(GetObject)
+#undef GetObject
+#endif
+
 #include <mbgl/map/map.hpp>
 #include <mbgl/renderer/renderer.hpp>
 #include <mbgl/storage/resource.hpp>
@@ -103,7 +107,7 @@ void writeJSON(rapidjson::PrettyWriter<rapidjson::StringBuffer>& writer, const m
                 [&writer](bool b) { writer.Bool(b); },
                 [&writer](uint64_t u) { writer.Uint64(u); },
                 [&writer](int64_t i) { writer.Int64(i); },
-                [&writer](double d) { d == std::floor(d) ? writer.Int64(d) : writer.Double(d); },
+                [&writer](double d) { d == std::floor(d) ? writer.Int64(static_cast<int64_t>(d)) : writer.Double(d); },
                 [&writer](const std::string& s) { writer.String(s); },
                 [&writer](const std::vector<mbgl::Value>& arr) {
                     writer.StartArray();
@@ -455,13 +459,13 @@ TestMetadata parseTestMetadata(const TestPaths& paths) {
 
     metadata.document = std::move(maybeJson.get<mbgl::JSDocument>());
     if (!metadata.document.HasMember("metadata")) {
-        mbgl::Log::Warning(mbgl::Event::ParseStyle, "Style has no 'metadata': %s", paths.stylePath.c_str());
+        mbgl::Log::Warning(mbgl::Event::ParseStyle, "Style has no 'metadata': " + paths.stylePath.string());
         return metadata;
     }
 
     const mbgl::JSValue& metadataValue = metadata.document["metadata"];
     if (!metadataValue.HasMember("test")) {
-        mbgl::Log::Warning(mbgl::Event::ParseStyle, "Style has no 'metadata.test': %s", paths.stylePath.c_str());
+        mbgl::Log::Warning(mbgl::Event::ParseStyle, "Style has no 'metadata.test': " + paths.stylePath.string());
         return metadata;
     }
 
@@ -482,7 +486,7 @@ TestMetadata parseTestMetadata(const TestPaths& paths) {
             metadata.mapMode = mbgl::MapMode::Static;
         else {
             mbgl::Log::Warning(
-                mbgl::Event::ParseStyle, "Unknown map mode: %s. Falling back to static mode", mapModeStr.c_str());
+                mbgl::Event::ParseStyle, "Unknown map mode: " + mapModeStr + ". Falling back to static mode");
             metadata.mapMode = mbgl::MapMode::Static;
         }
     }
@@ -564,6 +568,12 @@ TestMetadata parseTestMetadata(const TestPaths& paths) {
         }
         metadata.renderTest = false;
     }
+    
+    if (testValue.HasMember("ignoreProbing")) {
+        if (testValue["ignoreProbing"].IsBool()) {
+            metadata.ignoreProbing = testValue["ignoreProbing"].GetBool();
+        }
+    }
 
     if (testValue.HasMember("queryOptions")) {
         assert(testValue["queryOptions"].IsObject());
@@ -584,7 +594,7 @@ TestMetadata parseTestMetadata(const TestPaths& paths) {
             assert(testValue["queryOptions"]["filter"].IsArray());
             auto& filterVal = testValue["queryOptions"]["filter"];
             Error error;
-            mbgl::optional<Filter> converted = convert<Filter>(filterVal, error);
+            std::optional<Filter> converted = convert<Filter>(filterVal, error);
             assert(converted);
             metadata.queryOptions.filter = std::move(*converted);
         }
@@ -701,7 +711,7 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
             std::string imagePath = operationArray[2].GetString();
 
             result.emplace_back([imageName, imagePath, sdf, pixelRatio](TestContext& ctx) {
-                mbgl::optional<std::string> maybeImage;
+                std::optional<std::string> maybeImage;
                 bool requestCompleted = false;
 
                 auto req = ctx.getFileSource().request(mbgl::Resource::image("mapbox://render-tests/" + imagePath),
@@ -929,7 +939,7 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
             std::string path = std::string(operationArray[2].GetString(), operationArray[2].GetStringLength());
             assert(!path.empty());
 
-            float tolerance = operationArray[3].GetDouble();
+            float tolerance = static_cast<float>(operationArray[3].GetDouble());
             mbgl::filesystem::path filePath(path);
 
             bool compressed = false;
@@ -997,7 +1007,6 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
         } else if (operationArray[0].GetString() == networkProbeStartOp) {
             // probeNetworkStart
             result.emplace_back([](TestContext&) {
-                assert(!mbgl::ProxyFileSource::isTrackingActive());
                 mbgl::ProxyFileSource::setTrackingActive(true);
                 return true;
             });
@@ -1007,7 +1016,6 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
             assert(operationArray[1].IsString());
             std::string mark = std::string(operationArray[1].GetString(), operationArray[1].GetStringLength());
             result.emplace_back([mark](TestContext& ctx) {
-                assert(mbgl::ProxyFileSource::isTrackingActive());
                 ctx.getMetadata().metrics.network.emplace(
                     std::piecewise_construct,
                     std::forward_as_tuple(std::move(mark)),
@@ -1018,7 +1026,6 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
         } else if (operationArray[0].GetString() == networkProbeEndOp) {
             // probeNetworkEnd
             result.emplace_back([](TestContext&) {
-                assert(mbgl::ProxyFileSource::isTrackingActive());
                 mbgl::ProxyFileSource::setTrackingActive(false);
                 return true;
             });
@@ -1032,7 +1039,7 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
             using namespace mbgl::style::conversion;
 
             std::string sourceID;
-            mbgl::optional<std::string> sourceLayer;
+            std::optional<std::string> sourceLayer;
             std::string featureID;
             std::string stateKey;
             Value stateValue;
@@ -1055,9 +1062,9 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
             }
             const JSValue* state = &operationArray[2];
 
-            const std::function<optional<Error>(const std::string&, const Convertible&)> convertFn =
-                [&](const std::string& k, const Convertible& v) -> optional<Error> {
-                optional<Value> value = toValue(v);
+            const std::function<std::optional<Error>(const std::string&, const Convertible&)> convertFn =
+                [&](const std::string& k, const Convertible& v) -> std::optional<Error> {
+                std::optional<Value> value = toValue(v);
                 if (value) {
                     stateValue = std::move(*value);
                     valueParsed = true;
@@ -1066,7 +1073,7 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
                     std::size_t length = arrayLength(v);
                     array.reserve(length);
                     for (size_t i = 0; i < length; ++i) {
-                        optional<Value> arrayVal = toValue(arrayMember(v, i));
+                        std::optional<Value> arrayVal = toValue(arrayMember(v, i));
                         if (arrayVal) {
                             array.emplace_back(*arrayVal);
                         }
@@ -1075,7 +1082,7 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
                     values[k] = std::move(array);
                     stateValue = std::move(values);
                     valueParsed = true;
-                    return nullopt;
+                    return std::nullopt;
 
                 } else if (isObject(v)) {
                     eachMember(v, convertFn);
@@ -1083,11 +1090,11 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
 
                 if (!valueParsed) {
                     metadata.errorMessage = std::string("Could not get feature state value, state key: ") + k;
-                    return nullopt;
+                    return std::nullopt;
                 }
                 stateKey = k;
                 parsedState[stateKey] = stateValue;
-                return nullopt;
+                return std::nullopt;
             };
 
             eachMember(state, convertFn);
@@ -1107,7 +1114,7 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
             assert(operationArray[1].IsObject());
 
             std::string sourceID;
-            mbgl::optional<std::string> sourceLayer;
+            std::optional<std::string> sourceLayer;
             std::string featureID;
 
             const auto& featureOptions = operationArray[1].GetObject();
@@ -1141,9 +1148,9 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
             assert(operationArray[1].IsObject());
 
             std::string sourceID;
-            mbgl::optional<std::string> sourceLayer;
+            std::optional<std::string> sourceLayer;
             std::string featureID;
-            mbgl::optional<std::string> stateKey;
+            std::optional<std::string> stateKey;
 
             const auto& featureOptions = operationArray[1].GetObject();
             if (featureOptions.HasMember("source")) {
@@ -1189,7 +1196,7 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
             }
 
             std::string mark = operationArray[1].GetString();
-            int duration = operationArray[2].GetFloat();
+            int duration = static_cast<int>(operationArray[2].GetFloat());
             mbgl::LatLng startPos, endPos;
             double startZoom, endZoom;
 
@@ -1235,7 +1242,7 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
                     samples.push_back(frameTime);
                 }
 
-                float averageFps = totalTime > 0.0 ? frames / totalTime : 0.0;
+                float averageFps = totalTime > 0.0f ? frames / totalTime : 0.0f;
                 float minFrameTime = 0.0;
 
                 // Use 1% of the longest frames to compute the minimum fps
@@ -1252,7 +1259,6 @@ TestOperations parseTestOperations(TestMetadata& metadata) {
         } else if (operationArray[0].GetString() == gfxProbeStartOp) {
             // probeGFXStart
             result.emplace_back([](TestContext& ctx) {
-                assert(!ctx.gfxProbeActive);
                 ctx.gfxProbeActive = true;
                 ctx.baselineGfxProbe = ctx.activeGfxProbe;
                 return true;

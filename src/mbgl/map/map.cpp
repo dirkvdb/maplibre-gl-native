@@ -80,7 +80,7 @@ void Map::triggerRepaint() {
     impl->onUpdate();
 }
 
-#pragma mark - Style
+// MARK: - Style
 
 style::Style& Map::getStyle() {
     return *impl->style;
@@ -99,7 +99,7 @@ void Map::setStyle(std::unique_ptr<Style> style) {
     }
 }
 
-#pragma mark - Transitions
+// MARK: - Transitions
 
 void Map::cancelTransitions() {
     impl->transform.cancelTransitions();
@@ -127,9 +127,9 @@ bool Map::isPanning() const {
     return impl->transform.isPanning();
 }
 
-#pragma mark -
+// MARK: -
 
-CameraOptions Map::getCameraOptions(const optional<EdgeInsets>& padding) const {
+CameraOptions Map::getCameraOptions(const std::optional<EdgeInsets>& padding) const {
     return impl->transform.getCameraOptions(padding);
 }
 
@@ -159,7 +159,7 @@ void Map::pitchBy(double pitch, const AnimationOptions& animation) {
     easeTo(CameraOptions().withPitch((impl->transform.getPitch() * util::RAD2DEG_D) - pitch), animation);
 }
 
-void Map::scaleBy(double scale, const optional<ScreenCoordinate>& anchor, const AnimationOptions& animation) {
+void Map::scaleBy(double scale, const std::optional<ScreenCoordinate>& anchor, const AnimationOptions& animation) {
     const double zoom = impl->transform.getZoom() + impl->transform.getState().scaleZoom(scale);
     easeTo(CameraOptions().withZoom(zoom).withAnchor(anchor), animation);
 }
@@ -172,8 +172,8 @@ void Map::rotateBy(const ScreenCoordinate& first, const ScreenCoordinate& second
 
 CameraOptions Map::cameraForLatLngBounds(const LatLngBounds& bounds,
                                          const EdgeInsets& padding,
-                                         const optional<double>& bearing,
-                                         const optional<double>& pitch) const {
+                                         const std::optional<double>& bearing,
+                                         const std::optional<double>& pitch) const {
     return cameraForLatLngs(
         {
             bounds.northwest(),
@@ -233,8 +233,8 @@ CameraOptions cameraForLatLngs(const std::vector<LatLng>& latLngs, const Transfo
 
 CameraOptions Map::cameraForLatLngs(const std::vector<LatLng>& latLngs,
                                     const EdgeInsets& padding,
-                                    const optional<double>& bearing,
-                                    const optional<double>& pitch) const {
+                                    const std::optional<double>& bearing,
+                                    const std::optional<double>& pitch) const {
     if (!bearing && !pitch) {
         return mbgl::cameraForLatLngs(latLngs, impl->transform, padding);
     }
@@ -252,8 +252,8 @@ CameraOptions Map::cameraForLatLngs(const std::vector<LatLng>& latLngs,
 
 CameraOptions Map::cameraForGeometry(const Geometry<double>& geometry,
                                      const EdgeInsets& padding,
-                                     const optional<double>& bearing,
-                                     const optional<double>& pitch) const {
+                                     const std::optional<double>& bearing,
+                                     const std::optional<double>& pitch) const {
     std::vector<LatLng> latLngs;
     forEachPoint(geometry, [&](const Point<double>& pt) {
         latLngs.emplace_back(pt.y, pt.x);
@@ -293,7 +293,7 @@ LatLngBounds Map::latLngBoundsForCameraUnwrapped(const CameraOptions& camera) co
     return bounds;
 }
 
-#pragma mark - Bounds
+// MARK: - Bounds
 
 void Map::setBounds(const BoundOptions& options) {
     bool changeCamera = false;
@@ -350,7 +350,7 @@ BoundOptions Map::getBounds() const {
         .withMaxPitch(impl->transform.getState().getMaxPitch() * util::RAD2DEG_D);
 }
 
-#pragma mark - Map options
+// MARK: - Map options
 
 void Map::setSize(const Size size) {
     impl->transform.resize(size);
@@ -383,7 +383,7 @@ MapOptions Map::getMapOptions() const {
         .withPixelRatio(impl->pixelRatio));
 }
 
-#pragma mark - Projection mode
+// MARK: - Projection mode
 
 void Map::setProjectionMode(const ProjectionMode& options) {
     impl->transform.setProjectionMode(options);
@@ -394,7 +394,7 @@ ProjectionMode Map::getProjectionMode() const {
     return impl->transform.getProjectionMode();
 }
 
-#pragma mark - Projection
+// MARK: - Projection
 
 ScreenCoordinate Map::pixelForLatLng(const LatLng& latLng) const {
     // If the center and point longitudes are not in the same side of the
@@ -427,13 +427,13 @@ std::vector<LatLng> Map::latLngsForPixels(const std::vector<ScreenCoordinate>& s
     return ret;
 }
 
-#pragma mark - Transform
+// MARK: - Transform
 
 TransformState Map::getTransfromState() const {
     return impl->transform.getState();
 }
 
-#pragma mark - Annotations
+// MARK: - Annotations
 
 void Map::addAnnotationImage(std::unique_ptr<style::Image> image) {
     if (LayerManager::annotationsEnabled) {
@@ -478,7 +478,7 @@ void Map::removeAnnotation(AnnotationID annotation) {
     }
 }
 
-#pragma mark - Toggles
+// MARK: - Toggles
 
 void Map::setDebug(MapDebugOptions debugOptions) {
     impl->debugOptions = debugOptions;

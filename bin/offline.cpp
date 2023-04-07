@@ -126,9 +126,9 @@ int main(int argc, char *argv[]) {
     std::string style = styleValue ? args::get(styleValue) : mapTilerConfiguration.defaultStyles().at(0).getUrl();
     std::cout << " Style: " << style << std::endl;
     
-    mbgl::optional<std::string> mergePath = {};
+    std::optional<std::string> mergePath = std::nullopt;
     if (mergePathValue) mergePath = args::get(mergePathValue);
-    mbgl::optional<std::string> inputDb = {};
+    std::optional<std::string> inputDb = std::nullopt;
     if (inputValue) inputDb = args::get(inputValue);
 
     const double minZoom = minZoomValue ? args::get(minZoomValue) : 0.0;
@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
             try {
                 std::string json = readFile(geometryValue.Get());
                 auto geometry = parseGeometry(json);
-                return OfflineRegionDefinition{ OfflineGeometryRegionDefinition(style, geometry, minZoom, maxZoom, pixelRatio, includeIdeographs) };
+                return OfflineRegionDefinition{ OfflineGeometryRegionDefinition(style, geometry, minZoom, maxZoom, static_cast<float>(pixelRatio), includeIdeographs) };
             } catch(const std::runtime_error& e) {
                 std::cerr << "Could not parse geojson file " << geometryValue.Get() << ": " << e.what() << std::endl;
                 exit(1);
@@ -156,11 +156,11 @@ int main(int argc, char *argv[]) {
             const double south = southValue ? args::get(southValue) : 38.1;
             const double east = eastValue ? args::get(eastValue) : -121.7;
             LatLngBounds boundingBox = LatLngBounds::hull(LatLng(north, west), LatLng(south, east));
-            return OfflineRegionDefinition{ OfflineTilePyramidRegionDefinition(style, boundingBox, minZoom, maxZoom, pixelRatio, includeIdeographs) };
+            return OfflineRegionDefinition{ OfflineTilePyramidRegionDefinition(style, boundingBox, minZoom, maxZoom, static_cast<float>(pixelRatio), includeIdeographs) };
         }
     }();
 
-    const char* apiEnv = getenv("MGL_API_KEY");
+    const char* apiEnv = getenv("MLN_API_KEY");
     const std::string apiKey = tokenValue ? args::get(tokenValue) : (apiEnv ? apiEnv : std::string());
     
     if (apiBaseValue) {
@@ -205,7 +205,7 @@ int main(int argc, char *argv[]) {
         Observer(OfflineRegion& region_,
                  std::shared_ptr<DatabaseFileSource> fileSource_,
                  util::RunLoop& loop_,
-                 mbgl::optional<std::string> mergePath_)
+                 std::optional<std::string> mergePath_)
             : region(region_),
               fileSource(std::move(fileSource_)),
               loop(loop_),
@@ -249,7 +249,7 @@ int main(int argc, char *argv[]) {
         OfflineRegion& region;
         std::shared_ptr<DatabaseFileSource> fileSource;
         util::RunLoop& loop;
-        mbgl::optional<std::string> mergePath;
+        std::optional<std::string> mergePath;
         Timestamp start;
     };
 

@@ -41,6 +41,8 @@ import static com.mapbox.mapboxsdk.constants.MapboxConstants.ZOOM_RATE;
 import static com.mapbox.mapboxsdk.maps.MapboxMap.OnCameraMoveStartedListener.REASON_API_GESTURE;
 import static com.mapbox.mapboxsdk.utils.MathUtils.normalize;
 
+import timber.log.Timber;
+
 /**
  * Manages gestures events on a MapView.
  */
@@ -124,16 +126,16 @@ final class MapGestureDetector {
           com.mapbox.android.gestures.R.dimen.mapbox_defaultScaleSpanSinceStartThreshold));
       MoveGestureListener moveGestureListener = new MoveGestureListener();
       ScaleGestureListener scaleGestureListener = new ScaleGestureListener(
-        context.getResources().getDimension(R.dimen.mapbox_density_constant),
-        context.getResources().getDimension(R.dimen.mapbox_minimum_scale_speed),
-        context.getResources().getDimension(R.dimen.mapbox_minimum_angled_scale_speed),
-        context.getResources().getDimension(R.dimen.mapbox_minimum_scale_velocity)
+        context.getResources().getDimension(R.dimen.maplibre_density_constant),
+        context.getResources().getDimension(R.dimen.maplibre_minimum_scale_speed),
+        context.getResources().getDimension(R.dimen.maplibre_minimum_angled_scale_speed),
+        context.getResources().getDimension(R.dimen.maplibre_minimum_scale_velocity)
       );
       RotateGestureListener rotateGestureListener = new RotateGestureListener(
-        context.getResources().getDimension(R.dimen.mapbox_minimum_scale_span_when_rotating),
-        context.getResources().getDimension(R.dimen.mapbox_density_constant),
-        context.getResources().getDimension(R.dimen.mapbox_angular_velocity_multiplier),
-        context.getResources().getDimension(R.dimen.mapbox_minimum_angular_velocity),
+        context.getResources().getDimension(R.dimen.maplibre_minimum_scale_span_when_rotating),
+        context.getResources().getDimension(R.dimen.maplibre_density_constant),
+        context.getResources().getDimension(R.dimen.maplibre_angular_velocity_multiplier),
+        context.getResources().getDimension(R.dimen.maplibre_minimum_angular_velocity),
         context.getResources().getDimension(
           com.mapbox.android.gestures.R.dimen.mapbox_defaultScaleSpanSinceStartThreshold));
       ShoveGestureListener shoveGestureListener = new ShoveGestureListener();
@@ -417,7 +419,7 @@ final class MapGestureDetector {
 
       // calculate velocity vector for xy dimensions, independent from screen size
       double velocityXY = Math.hypot(velocityX / screenDensity, velocityY / screenDensity);
-      if (velocityXY < MapboxConstants.VELOCITY_THRESHOLD_IGNORE_FLING) {
+      if (velocityXY < uiSettings.getFlingThreshold()) {
         // ignore short flings, these can occur when other gestures just have finished executing
         return false;
       }
@@ -425,11 +427,17 @@ final class MapGestureDetector {
       // tilt results in a bigger translation, limiting input for #5281
       double tilt = transform.getTilt();
       double tiltFactor = 1.5 + ((tilt != 0) ? (tilt / 10) : 0);
-      double offsetX = velocityX / tiltFactor / screenDensity;
-      double offsetY = velocityY / tiltFactor / screenDensity;
 
       // calculate animation time based on displacement
-      long animationTime = (long) (velocityXY / 7 / tiltFactor + MapboxConstants.ANIMATION_DURATION_FLING_BASE);
+      long animationTime = (long) (velocityXY / 7 / tiltFactor + uiSettings.getFlingAnimationBaseTime());
+
+      // screenDensity and influcentcetilt come in here via animationTime
+      // factor 1000 because speed is in pixels/s
+      // and the factor 0.28 was determined by testing: panning the map and releasing
+      //  should result in fling animation starting at same speed as the move before
+      double offsetX = velocityX * animationTime * 0.28 / 1000;
+      double offsetY = velocityY * animationTime * 0.28 / 1000;
+
       if (!uiSettings.isHorizontalScrollGesturesEnabled()) {
         // determine if angle of fling is valid for performing a vertical fling
         double angle = Math.abs(Math.toDegrees(Math.atan(offsetX / offsetY)));
@@ -480,7 +488,7 @@ final class MapGestureDetector {
     @Override
     public boolean onMove(@NonNull MoveGestureDetector detector, float distanceX, float distanceY) {
       // first move event is often delivered with no displacement
-      if (distanceX != 0 || distanceY != 0) {
+      if (!Float.isNaN(distanceX) && !Float.isNaN(distanceY) && (distanceX != 0 || distanceY != 0)) {
         // dispatching camera start event only when the movement actually occurred
         cameraChangeDispatcher.onCameraMoveStarted(CameraChangeDispatcher.REASON_API_GESTURE);
 
@@ -493,6 +501,8 @@ final class MapGestureDetector {
         transform.moveBy(-distanceX, -distanceY, 0 /*no duration*/);
 
         notifyOnMoveListeners(detector);
+      } else {
+        Timber.e("Could not call onMove with parameters %s,%s", distanceX, distanceY);
       }
       return true;
     }

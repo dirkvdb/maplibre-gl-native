@@ -43,7 +43,7 @@ Transform::Transform(MapObserver& observer_,
     : observer(observer_), state(constrainMode, viewportMode) {
 }
 
-#pragma mark - Map View
+// MARK: - Map View
 
 void Transform::resize(const Size size) {
     if (size.isEmpty()) {
@@ -65,9 +65,9 @@ void Transform::resize(const Size size) {
     observer.onCameraDidChange(MapObserver::CameraChangeMode::Immediate);
 }
 
-#pragma mark - Camera
+// MARK: - Camera
 
-CameraOptions Transform::getCameraOptions(const optional<EdgeInsets>& padding) const {
+CameraOptions Transform::getCameraOptions(const std::optional<EdgeInsets>& padding) const {
     return state.getCameraOptions(padding);
 }
 
@@ -341,7 +341,7 @@ void Transform::flyTo(const CameraOptions& camera, const AnimationOptions& anima
         duration);
 }
 
-#pragma mark - Position
+// MARK: - Position
 
 void Transform::moveBy(const ScreenCoordinate& offset, const AnimationOptions& animation) {
     ScreenCoordinate centerOffset = {offset.x, offset.y};
@@ -355,13 +355,13 @@ LatLng Transform::getLatLng(LatLng::WrapMode wrap) const {
     return state.getLatLng(wrap);
 }
 
-#pragma mark - Zoom
+// MARK: - Zoom
 
 double Transform::getZoom() const {
     return state.getZoom();
 }
 
-#pragma mark - Bounds
+// MARK: - Bounds
 
 void Transform::setLatLngBounds(LatLngBounds bounds) {
     if (!bounds.valid()) {
@@ -384,8 +384,8 @@ void Transform::setMinPitch(const double minPitch) {
     if (std::isnan(minPitch)) return;
     if (minPitch * util::DEG2RAD_D < util::PITCH_MIN) {
         Log::Warning(Event::General,
-                     "Trying to set minimum pitch below the limit (%.0f degrees), the value will be clamped.",
-                     util::PITCH_MIN * util::RAD2DEG_D);
+                     "Trying to set minimum pitch below the limit (" + std::to_string(util::PITCH_MIN * util::RAD2DEG_D) + 
+                     " degrees), the value will be clamped.");
     }
     state.setMinPitch(minPitch * util::DEG2RAD_D);
 }
@@ -394,13 +394,13 @@ void Transform::setMaxPitch(const double maxPitch) {
     if (std::isnan(maxPitch)) return;
     if (maxPitch * util::DEG2RAD_D > util::PITCH_MAX) {
         Log::Warning(Event::General,
-                     "Trying to set maximum pitch above the limit (%.0f degrees), the value will be clamped.",
-                     util::PITCH_MAX * util::RAD2DEG_D);
+                     "Trying to set maximum pitch above the limit (" + std::to_string(util::PITCH_MAX * util::RAD2DEG_D) +
+                     " degrees), the value will be clamped.");
     }
     state.setMaxPitch(maxPitch * util::DEG2RAD_D);
 }
 
-#pragma mark - Bearing
+// MARK: - Bearing
 
 void Transform::rotateBy(const ScreenCoordinate& first,
                          const ScreenCoordinate& second,
@@ -426,13 +426,13 @@ double Transform::getBearing() const {
     return state.getBearing();
 }
 
-#pragma mark - Pitch
+// MARK: - Pitch
 
 double Transform::getPitch() const {
     return state.getPitch();
 }
 
-#pragma mark - North Orientation
+// MARK: - North Orientation
 
 void Transform::setNorthOrientation(NorthOrientation orientation) {
     state.setNorthOrientation(orientation);
@@ -447,7 +447,7 @@ NorthOrientation Transform::getNorthOrientation() const {
     return state.getNorthOrientation();
 }
 
-#pragma mark - Constrain mode
+// MARK: - Constrain mode
 
 void Transform::setConstrainMode(mbgl::ConstrainMode mode) {
     state.setConstrainMode(mode);
@@ -462,7 +462,7 @@ ConstrainMode Transform::getConstrainMode() const {
     return state.getConstrainMode();
 }
 
-#pragma mark - Viewport mode
+// MARK: - Viewport mode
 
 void Transform::setViewportMode(mbgl::ViewportMode mode) {
     state.setViewportMode(mode);
@@ -472,7 +472,7 @@ ViewportMode Transform::getViewportMode() const {
     return state.getViewportMode();
 }
 
-#pragma mark - Projection mode
+// MARK: - Projection mode
 
 void Transform::setProjectionMode(const ProjectionMode& options) {
     state.setProperties(TransformStateProperties()
@@ -488,7 +488,7 @@ ProjectionMode Transform::getProjectionMode() const {
         .withYSkew(state.getYSkew());
 }
 
-#pragma mark - Transition
+// MARK: - Transition
 
 void Transform::startTransition(const CameraOptions& camera,
                                 const AnimationOptions& animation,
@@ -505,7 +505,7 @@ void Transform::startTransition(const CameraOptions& camera,
     // Associate the anchor, if given, with a coordinate.
     // Anchor and center points are mutually exclusive, with preference for the
     // center point when both are set.
-    optional<ScreenCoordinate> anchor = camera.center ? nullopt : camera.anchor;
+    std::optional<ScreenCoordinate> anchor = camera.center ? std::nullopt : camera.anchor;
     LatLng anchorLatLng;
     if (anchor) {
         anchor->y = state.getSize().height - anchor->y;
@@ -620,7 +620,7 @@ void Transform::setGestureInProgress(bool inProgress) {
     state.setGestureInProgress(inProgress);
 }
 
-#pragma mark Conversion and projection
+// MARK: Conversion and projection
 
 ScreenCoordinate Transform::latLngToScreenCoordinate(const LatLng& latLng) const {
     ScreenCoordinate point = state.latLngToScreenCoordinate(latLng);

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <mbgl/util/optional.hpp>
 #include <mbgl/util/chrono.hpp>
 #include <mbgl/map/bound_options.hpp>
 #include <mbgl/map/map_observer.hpp>
@@ -20,6 +19,7 @@
 #include <functional>
 #include <vector>
 #include <memory>
+#include <optional>
 
 namespace mbgl {
 
@@ -40,13 +40,13 @@ public:
                  const ClientOptions& = ClientOptions());
     ~Map();
 
-    // Register a callback that will get called (on the render thread) when all resources have
-    // been loaded and a complete render occurs.
+    /// Register a callback that will get called (on the render thread) when all resources have
+    /// been loaded and a complete render occurs.
     using StillImageCallback = std::function<void (std::exception_ptr)>;
     void renderStill(StillImageCallback);
     void renderStill(const CameraOptions&, MapDebugOptions, StillImageCallback);
 
-    // Triggers a repaint.
+    /// Triggers a repaint.
     void triggerRepaint();
 
           style::Style& getStyle();
@@ -63,26 +63,26 @@ public:
     bool isPanning() const;
 
     // Camera
-    CameraOptions getCameraOptions(const optional<EdgeInsets>& = {}) const;
+    CameraOptions getCameraOptions(const std::optional<EdgeInsets>& = std::nullopt) const;
     void jumpTo(const CameraOptions&);
     void easeTo(const CameraOptions&, const AnimationOptions&);
     void flyTo(const CameraOptions&, const AnimationOptions&);
     void moveBy(const ScreenCoordinate&, const AnimationOptions& = {});
-    void scaleBy(double scale, const optional<ScreenCoordinate>& anchor, const AnimationOptions& animation = {});
+    void scaleBy(double scale, const std::optional<ScreenCoordinate>& anchor, const AnimationOptions& animation = {});
     void pitchBy(double pitch, const AnimationOptions& animation = {});
     void rotateBy(const ScreenCoordinate& first, const ScreenCoordinate& second, const AnimationOptions& = {});
     CameraOptions cameraForLatLngBounds(const LatLngBounds&,
                                         const EdgeInsets&,
-                                        const optional<double>& bearing = {},
-                                        const optional<double>& pitch = {}) const;
+                                        const std::optional<double>& bearing = std::nullopt,
+                                        const std::optional<double>& pitch = std::nullopt) const;
     CameraOptions cameraForLatLngs(const std::vector<LatLng>&,
                                    const EdgeInsets&,
-                                   const optional<double>& bearing = {},
-                                   const optional<double>& pitch = {}) const;
+                                   const std::optional<double>& bearing = std::nullopt,
+                                   const std::optional<double>& pitch = std::nullopt) const;
     CameraOptions cameraForGeometry(const Geometry<double>&,
                                     const EdgeInsets&,
-                                    const optional<double>& bearing = {},
-                                    const optional<double>& pitch = {}) const;
+                                    const std::optional<double>& bearing = std::nullopt,
+                                    const std::optional<double>& pitch = std::nullopt) const;
     LatLngBounds latLngBoundsForCamera(const CameraOptions&) const;
     LatLngBounds latLngBoundsForCameraUnwrapped(const CameraOptions&) const;
 
@@ -127,10 +127,10 @@ public:
 
     // Tile prefetching
     //
-    // When loading a map, if `PrefetchZoomDelta` is set to any number greater than 0, the map will
-    // first request a tile for `zoom - delta` in a attempt to display a full map at lower
-    // resolution as quick as possible. It will get clamped at the tile source minimum zoom. The
-    // default `delta` is 4.
+    /// When loading a map, if `PrefetchZoomDelta` is set to any number greater than 0, the map will
+    /// first request a tile for `zoom - delta` in a attempt to display a full map at lower
+    /// resolution as quick as possible. It will get clamped at the tile source minimum zoom. The
+    /// default `delta` is 4.
     void setPrefetchZoomDelta(uint8_t delta);
     uint8_t getPrefetchZoomDelta() const;
 
@@ -141,11 +141,11 @@ public:
     bool isFullyLoaded() const;
     void dumpDebugLogs() const;
 
-    // FreeCameraOptions provides more direct access to the underlying camera entity.
-    // For backwards compatibility the state set using this API must be representable with
-    // `CameraOptions` as well. Parameters are clamped to a valid range or discarded as invalid
-    // if the conversion to the pitch and bearing presentation is ambiguous. For example orientation
-    // can be invalid if it leads to the camera being upside down or the quaternion has zero length.
+    /// FreeCameraOptions provides more direct access to the underlying camera entity.
+    /// For backwards compatibility the state set using this API must be representable with
+    /// `CameraOptions` as well. Parameters are clamped to a valid range or discarded as invalid
+    /// if the conversion to the pitch and bearing presentation is ambiguous. For example orientation
+    /// can be invalid if it leads to the camera being upside down or the quaternion has zero length.
     void setFreeCameraOptions(const FreeCameraOptions& camera);
     FreeCameraOptions getFreeCameraOptions() const;
 

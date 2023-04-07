@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.19)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13")
 
 # Override default CMake NATIVE_ARCH_ACTUAL
 # https://gitlab.kitware.com/cmake/cmake/-/issues/20893
@@ -158,4 +158,11 @@ set_target_properties(mbgl-benchmark-runner mbgl-test-runner mbgl-render-test-ru
 if(NOT DEFINED ENV{CI})
     add_test(NAME mbgl-benchmark-runner COMMAND mbgl-benchmark-runner WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 endif()
-add_test(NAME mbgl-test-runner COMMAND mbgl-test-runner WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+add_test(
+    NAME mbgl-test-runner
+    COMMAND
+        node
+        ${PROJECT_SOURCE_DIR}/test/storage/with-server.js
+        ${PROJECT_SOURCE_DIR}/test/storage/server.js
+        $<TARGET_FILE:mbgl-test-runner>
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

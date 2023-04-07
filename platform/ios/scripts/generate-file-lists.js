@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const xcode = require('xcode');
 
-require('./style-code');
+require('../../../scripts/style-code');
 
 const classifier = /^(?:(?:(?:platform|vendor)\/(?:(?!include|src).)*\/|(?:test|benchmark)\/)?(?:(include|src)\/)?)?(.+\.h(?:pp|xx)?)$/;
 
@@ -147,7 +147,7 @@ generateFileList('vendor/mapbox-base-files.json',
       'vendor/mapbox-base/mapbox/weak',
       'vendor/mapbox-base/mapbox/typewrapper',
       'vendor/mapbox-base/mapbox/value'], 
-    vendorRegex, [ "include/*.hpp", "include/**/*.hpp", "include/**/*.h", "optional.hpp", ":!:include/jni/string_conversion.hpp" ]);
+    vendorRegex, [ "include/*.hpp", "include/**/*.hpp", "include/**/*.h", ":!:include/jni/string_conversion.hpp" ]);
 generateFileList('vendor/polylabel-files.json', [ 'vendor/polylabel' ], vendorRegex, [ "include/**/*.hpp" ]);
 generateFileList('vendor/protozero-files.json', [ 'vendor/protozero' ], vendorRegex, [ "include/**/*.hpp" ]);
 generateFileList('vendor/shelf-pack-cpp-files.json', [ 'vendor/shelf-pack-cpp' ], vendorRegex, [ "include/**/*.hpp" ]);

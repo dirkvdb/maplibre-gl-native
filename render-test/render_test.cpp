@@ -97,8 +97,7 @@ ArgumentsTuple parseArguments(int argc, char** argv) {
     mbgl::filesystem::path manifestPath = args::get(testPathValue);
     if (!mbgl::filesystem::exists(manifestPath) || !manifestPath.has_filename()) {
         mbgl::Log::Error(mbgl::Event::General,
-                         "Provided test manifest file path '%s' does not exist",
-                         manifestPath.string().c_str());
+                         "Provided test manifest file path '" + manifestPath.string() + "' does not exist");
         exit(3);
     }
 
@@ -225,12 +224,14 @@ int runRenderTests(int argc, char** argv, std::function<void()> testStatus) {
                 status = "errored";
                 color = "red";
                 stats.erroredTests++;
+                returnCode = 2;
                 printf(ANSI_COLOR_RED "* errored %s" ANSI_COLOR_RESET "\n", id.c_str());
                 printf(ANSI_COLOR_RED "* error: %s" ANSI_COLOR_RESET "\n", metadata.errorMessage.c_str());
             } else {
                 status = "failed";
                 color = "red";
                 stats.failedTests++;
+                returnCode = 3;
                 printf(ANSI_COLOR_RED "* failed %s" ANSI_COLOR_RESET "\n", id.c_str());
             }
         }

@@ -76,11 +76,11 @@ struct MemoryProbe {
     float tolerance;
 
     static std::tuple<bool, float> checkPeak(const MemoryProbe& expected, const MemoryProbe& actual) {
-        return checkValue(expected.peak, actual.peak, actual.tolerance);
+        return checkValue(static_cast<float>(expected.peak), static_cast<float>(actual.peak), actual.tolerance);
     }
 
     static std::tuple<bool, float> checkAllocations(const MemoryProbe& expected, const MemoryProbe& actual) {
-        return checkValue(expected.allocations, actual.allocations, actual.tolerance);
+        return checkValue(static_cast<float>(expected.allocations), static_cast<float>(actual.allocations), actual.tolerance);
     }
 };
 
@@ -138,6 +138,11 @@ struct TestMetadata {
     bool renderTest = true;
     bool outputsImage = true;
     bool ignoredTest = false;
+    // If unit test hasn't metric.json, the unit test will end with
+    // error message: "Failed to find expectations for..., to prevent
+    // unit test error by missing metric.json, can turn on 'ignoreProbing'
+    // to prevent the unit test fail, and just verify the render result.
+    bool ignoreProbing = false;
 
     mbgl::Size size{ 512u, 512u };
     float pixelRatio = 1.0f;
