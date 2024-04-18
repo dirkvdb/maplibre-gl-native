@@ -27,7 +27,7 @@ if(NOT MBGL_QT_LIBRARY_ONLY)
 endif()
 
 if(NOT MBGL_QT_WITH_INTERNAL_SQLITE)
-    find_package(sqlite3 CONFIG REQUIRED)
+    find_package(unofficial-sqlite3 CONFIG REQUIRED)
 else()
     message(STATUS "Using internal sqlite")
     include(${PROJECT_SOURCE_DIR}/vendor/sqlite.cmake)
@@ -146,7 +146,7 @@ target_link_libraries(
         Qt${QT_VERSION_MAJOR}::Core
         Qt${QT_VERSION_MAJOR}::Gui
         Qt${QT_VERSION_MAJOR}::Network
-        $<IF:$<BOOL:${MBGL_QT_WITH_INTERNAL_SQLITE}>,mbgl-vendor-sqlite,sqlite3>
+        $<IF:$<BOOL:${MBGL_QT_WITH_INTERNAL_SQLITE}>,mbgl-vendor-sqlite,unofficial::sqlite3::sqlite3>
         $<$<PLATFORM_ID:Linux>:$<IF:$<BOOL:${MBGL_QT_WITH_INTERNAL_ICU}>,mbgl-vendor-icu,ICU::uc>>
         mbgl-vendor-nunicode
 )
@@ -257,7 +257,7 @@ if (MBGL_QT_STATIC AND NOT MBGL_QT_INSIDE_PLUGIN)
     target_link_libraries(
         qmaplibregl
         PUBLIC
-            $<$<NOT:$<BOOL:${MBGL_QT_WITH_INTERNAL_SQLITE}>>:sqlite3>
+            $<$<NOT:$<BOOL:${MBGL_QT_WITH_INTERNAL_SQLITE}>>:unofficial::sqlite3::sqlite3>
             ZLIB::ZLIB
     )
 endif()
