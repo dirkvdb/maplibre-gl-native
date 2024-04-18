@@ -1,11 +1,13 @@
 #include "run_loop_impl.hpp"
 
-#include <mbgl/util/platform.hpp>
-#include <mbgl/util/thread_local.hpp>
-#include <mbgl/util/thread.hpp>
-#include <mbgl/util/timer.hpp>
 #include <mbgl/actor/scheduler.hpp>
 #include <mbgl/util/event.hpp>
+#include <mbgl/util/logging.hpp>
+#include <mbgl/util/monotonic_timer.hpp>
+#include <mbgl/util/platform.hpp>
+#include <mbgl/util/thread.hpp>
+#include <mbgl/util/thread_local.hpp>
+#include <mbgl/util/timer.hpp>
 
 #include <android/looper.h>
 
@@ -18,10 +20,9 @@
 
 #include <fcntl.h>
 #include <unistd.h>
-#include <mbgl/util/logging.hpp>
 
 #define PIPE_OUT 0
-#define PIPE_IN  1
+#define PIPE_IN 1
 
 namespace {
 
@@ -29,7 +30,8 @@ using namespace mbgl::util;
 
 int looperCallbackNew(int fd, int, void* data) {
     int buffer[1];
-    while (read(fd, buffer, sizeof(buffer)) > 0) {}
+    while (read(fd, buffer, sizeof(buffer)) > 0) {
+    }
 
     auto runLoopImpl = reinterpret_cast<RunLoop::Impl*>(data);
 
@@ -41,7 +43,8 @@ int looperCallbackNew(int fd, int, void* data) {
 
 int looperCallbackDefault(int fd, int, void* data) {
     int buffer[1];
-    while (read(fd, buffer, sizeof(buffer)) > 0) {}
+    while (read(fd, buffer, sizeof(buffer)) > 0) {
+    }
 
     auto runLoopImpl = reinterpret_cast<RunLoop::Impl*>(data);
 
@@ -82,7 +85,8 @@ namespace util {
 // efficient way of waking up the RunLoop and it is also thread-safe.
 class Alarm {
 public:
-    Alarm(ActorRef<Alarm>, RunLoop::Impl* loop_) : loop(loop_) {}
+    Alarm(ActorRef<Alarm>, RunLoop::Impl* loop_)
+        : loop(loop_) {}
 
     void set(const Milliseconds& timeout) {
         alarm.start(timeout, mbgl::Duration::zero(), [this]() { loop->wake(); });
@@ -93,7 +97,8 @@ private:
     RunLoop::Impl* loop;
 };
 
-RunLoop::Impl::Impl(RunLoop* runLoop_, RunLoop::Type type) : runLoop(runLoop_) {
+RunLoop::Impl::Impl(RunLoop* runLoop_, RunLoop::Type type)
+    : runLoop(runLoop_) {
     loop = ALooper_prepare(0);
     assert(loop);
 
@@ -110,16 +115,16 @@ RunLoop::Impl::Impl(RunLoop* runLoop_, RunLoop::Type type) : runLoop(runLoop_) {
     int ret = 0;
 
     switch (type) {
-    case Type::New:
-        ret = ALooper_addFd(loop, fds[PIPE_OUT], ALOOPER_POLL_CALLBACK,
-            ALOOPER_EVENT_INPUT, looperCallbackNew, this);
-        break;
-    case Type::Default:
-        ret = ALooper_addFd(loop, fds[PIPE_OUT], ALOOPER_POLL_CALLBACK,
-            ALOOPER_EVENT_INPUT, looperCallbackDefault, this);
-        alarm = std::make_unique<Thread<Alarm>>("Alarm", this);
-        running = true;
-        break;
+        case Type::New:
+            ret = ALooper_addFd(
+                loop, fds[PIPE_OUT], ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT, looperCallbackNew, this);
+            break;
+        case Type::Default:
+            ret = ALooper_addFd(
+                loop, fds[PIPE_OUT], ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT, looperCallbackDefault, this);
+            alarm = std::make_unique<Thread<Alarm>>("Alarm", this);
+            running = true;
+            break;
     }
 
     if (ret != 1) {
@@ -163,6 +168,9 @@ void RunLoop::Impl::addRunnable(Runnable* runnable) {
 void RunLoop::Impl::removeRunnable(Runnable* runnable) {
     std::lock_guard<std::mutex> lock(mutex);
     runnables.remove(runnable);
+    if (runnables.empty()) {
+        cvEmpty.notify_all();
+    }
 }
 
 Milliseconds RunLoop::Impl::processRunnables() {
@@ -192,6 +200,10 @@ Milliseconds RunLoop::Impl::processRunnables() {
         runnable->runTask();
     }
 
+    if (runnables.empty()) {
+        cvEmpty.notify_all();
+    }
+
     if (runnables.empty() || nextDue == TimePoint::max()) {
         return Milliseconds(-1);
     }
@@ -204,12 +216,32 @@ Milliseconds RunLoop::Impl::processRunnables() {
     return timeout;
 }
 
+std::size_t RunLoop::Impl::waitForEmpty(Milliseconds timeout) {
+    const auto startTime = mbgl::util::MonotonicTimer::now();
+    while (true) {
+        std::size_t remaining;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            remaining = runnables.size();
+        }
+
+        const auto elapsed = mbgl::util::MonotonicTimer::now() - startTime;
+        const auto elapsedMillis = std::chrono::duration_cast<Milliseconds>(elapsed);
+        if (remaining == 0 || (Milliseconds::zero() < timeout && timeout <= elapsedMillis)) {
+            return remaining;
+        }
+
+        runLoop->runOnce();
+    }
+}
+
 RunLoop* RunLoop::Get() {
     assert(static_cast<RunLoop*>(Scheduler::GetCurrent()));
     return static_cast<RunLoop*>(Scheduler::GetCurrent());
 }
 
-RunLoop::RunLoop(Type type) : impl(std::make_unique<Impl>(this, type)) {
+RunLoop::RunLoop(Type type)
+    : impl(std::make_unique<Impl>(this, type)) {
     Scheduler::SetCurrent(this);
 }
 
@@ -225,13 +257,17 @@ void RunLoop::wake() {
     impl->wake();
 }
 
+std::size_t RunLoop::waitForEmpty(std::chrono::milliseconds timeout) {
+    return impl->waitForEmpty(timeout);
+}
+
 void RunLoop::run() {
     MBGL_VERIFY_THREAD(tid);
 
     impl->running = true;
 
     int outFd, outEvents;
-    char *outData = nullptr;
+    char* outData = nullptr;
 
     while (impl->running) {
         process();

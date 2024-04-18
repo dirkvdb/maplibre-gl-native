@@ -3,6 +3,7 @@
 #include <mbgl/renderer/image_atlas.hpp>
 #include <mbgl/text/glyph_atlas.hpp>
 #include <mbgl/tile/geometry_tile_data.hpp>
+#include <mbgl/util/containers.hpp>
 #include <memory>
 
 namespace mbgl {
@@ -19,17 +20,15 @@ public:
 
     virtual void createBucket(const ImagePositions&,
                               std::unique_ptr<FeatureIndex>&,
-                              std::unordered_map<std::string, LayerRenderData>&,
+                              mbgl::unordered_map<std::string, LayerRenderData>&,
                               bool,
                               bool,
                               const CanonicalTileID&) = 0;
 
-    virtual void prepareSymbols(const GlyphMap&, const GlyphPositions&, const ImageMap&, const ImagePositions&){};
+    virtual void prepareSymbols(const GlyphMap&, const GlyphPositions&, const ImageMap&, const ImagePositions&) {};
 
-    virtual bool hasSymbolInstances() const {
-        return true;
-    };
-    
+    virtual bool hasSymbolInstances() const { return true; };
+
     virtual bool hasDependencies() const = 0;
 };
 

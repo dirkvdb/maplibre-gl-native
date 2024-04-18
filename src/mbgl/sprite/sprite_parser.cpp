@@ -33,11 +33,9 @@ std::unique_ptr<style::Image> createStyleImage(const std::string& id,
         srcX + width > static_cast<int32_t>(image.size.width) ||
         srcY + height > static_cast<int32_t>(image.size.height)) {
         std::ostringstream ss;
-        ss << "Can't create image with invalid metrics: "
-            << width << "x" << height << "@" << srcX << "," << srcY
-            << " in " << image.size.width << "x" << image.size.height
-            << "@" << util::toString(ratio) << "x"
-            << " sprite";
+        ss << "Can't create image with invalid metrics: " << width << "x" << height << "@" << srcX << "," << srcY
+           << " in " << image.size.width << "x" << image.size.height << "@" << util::toString(ratio) << "x"
+           << " sprite";
         Log::Error(Event::Sprite, ss.str());
         return nullptr;
     }
@@ -66,7 +64,8 @@ uint16_t getUInt16(const JSValue& value, const char* property, const char* name,
             return v.GetUint();
         } else {
             Log::Warning(Event::Sprite,
-                         std::string("Invalid sprite image '") + name + "': value of '" + property + "' must be an integer between 0 and 65535");
+                         std::string("Invalid sprite image '") + name + "': value of '" + property +
+                             "' must be an integer between 0 and 65535");
         }
     }
 
@@ -79,7 +78,9 @@ double getDouble(const JSValue& value, const char* property, const char* name, c
         if (v.IsNumber()) {
             return v.GetDouble();
         } else {
-            Log::Warning(Event::Sprite, std::string("Invalid sprite image '") + name + "': value of '" + property + "' must be a number");
+            Log::Warning(
+                Event::Sprite,
+                std::string("Invalid sprite image '") + name + "': value of '" + property + "' must be a number");
         }
     }
 
@@ -92,7 +93,9 @@ bool getBoolean(const JSValue& value, const char* property, const char* name, co
         if (v.IsBool()) {
             return v.GetBool();
         } else {
-            Log::Warning(Event::Sprite, std::string("Invalid sprite image '") + name + "': value of '" + property + "' must be a boolean");
+            Log::Warning(
+                Event::Sprite,
+                std::string("Invalid sprite image '") + name + "': value of '" + property + "' must be a boolean");
         }
     }
 
@@ -113,11 +116,14 @@ style::ImageStretches getStretches(const JSValue& value, const char* property, c
                                                                stretch[rapidjson::SizeType(1)].GetFloat()});
                 } else {
                     Log::Warning(Event::Sprite,
-                                 "Invalid sprite image '" + std::string(name) + "': members of '" + property + "' must be an array of two numbers");
+                                 "Invalid sprite image '" + std::string(name) + "': members of '" + property +
+                                     "' must be an array of two numbers");
                 }
             }
         } else {
-            Log::Warning(Event::Sprite, "Invalid sprite image '" + std::string(name) + "': value of '" + property + "' must be an array");
+            Log::Warning(
+                Event::Sprite,
+                "Invalid sprite image '" + std::string(name) + "': value of '" + property + "' must be an array");
         }
     }
 
@@ -136,7 +142,8 @@ std::optional<style::ImageContent> getContent(const JSValue& value, const char* 
                                        content[rapidjson::SizeType(3)].GetFloat()};
         } else {
             Log::Warning(Event::Sprite,
-                         "Invalid sprite image '" + std::string(name) + "': value of '" + property + "' must be an array of four numbers");
+                         "Invalid sprite image '" + std::string(name) + "': value of '" + property +
+                             "' must be an array of four numbers");
         }
     }
 
@@ -145,7 +152,9 @@ std::optional<style::ImageContent> getContent(const JSValue& value, const char* 
 
 } // namespace
 
-std::vector<Immutable<style::Image::Impl>> parseSprite(const std::string& encodedImage, const std::string& json) {
+std::vector<Immutable<style::Image::Impl>> parseSprite(const std::string& id,
+                                                       const std::string& encodedImage,
+                                                       const std::string& json) {
     const PremultipliedImage raster = decodeImage(encodedImage);
 
     JSDocument doc;
@@ -163,6 +172,11 @@ std::vector<Immutable<style::Image::Impl>> parseSprite(const std::string& encode
     images.reserve(properties.MemberCount());
     for (const auto& property : properties) {
         const std::string name = {property.name.GetString(), property.name.GetStringLength()};
+        std::string completeName = name;
+        if (id != "default") {
+            completeName = id + ":";
+            completeName += name;
+        }
         const JSValue& value = property.value;
 
         if (value.IsObject()) {
@@ -176,8 +190,17 @@ std::vector<Immutable<style::Image::Impl>> parseSprite(const std::string& encode
             style::ImageStretches stretchY = getStretches(value, "stretchY", name.c_str());
             std::optional<style::ImageContent> content = getContent(value, "content", name.c_str());
 
-            auto image = createStyleImage(
-                name, raster, x, y, width, height, pixelRatio, sdf, std::move(stretchX), std::move(stretchY), content);
+            auto image = createStyleImage(completeName,
+                                          raster,
+                                          x,
+                                          y,
+                                          width,
+                                          height,
+                                          pixelRatio,
+                                          sdf,
+                                          std::move(stretchX),
+                                          std::move(stretchY),
+                                          content);
             if (image) {
                 images.push_back(std::move(image->baseImpl));
             }

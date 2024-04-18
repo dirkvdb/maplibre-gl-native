@@ -10,6 +10,7 @@
 #include "thread.h"
 
 #define StorageToThreadInfo reinterpret_cast<THREAD_INFO*&>(storage)
+#define StorageToConstThreadInfo reinterpret_cast<THREAD_INFO* const&>(storage)
 
 namespace mbgl {
 namespace util {
@@ -33,8 +34,8 @@ ThreadLocalBase::ThreadLocalBase() {
 }
 
 ThreadLocalBase::~ThreadLocalBase() {
-    // ThreadLocal will not take ownership of the pointer it is managing. The pointer
-    // needs to be explicitly cleared before we destroy this object.
+    // ThreadLocal will not take ownership of the pointer it is managing. The
+    // pointer needs to be explicitly cleared before we destroy this object.
     assert(!get());
 
     DWORD key = StorageToThreadInfo->key;
@@ -47,8 +48,8 @@ ThreadLocalBase::~ThreadLocalBase() {
     }
 }
 
-void* ThreadLocalBase::get() {
-    return TlsGetValue(StorageToThreadInfo->key);
+void* ThreadLocalBase::get() const {
+    return TlsGetValue(StorageToConstThreadInfo->key);
 }
 
 void ThreadLocalBase::set(void* ptr) {

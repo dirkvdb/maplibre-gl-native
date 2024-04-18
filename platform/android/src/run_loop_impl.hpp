@@ -18,7 +18,8 @@ namespace util {
 
 using WatchCallback = std::function<void(int, RunLoop::Event)>;
 
-template <typename T> class Thread;
+template <typename T>
+class Thread;
 class Alarm;
 
 class RunLoop::Impl {
@@ -41,6 +42,8 @@ public:
 
     Milliseconds processRunnables();
 
+    std::size_t waitForEmpty(Milliseconds timeout);
+
     ALooper* loop = nullptr;
     RunLoop* runLoop = nullptr;
     std::atomic<bool> running;
@@ -56,6 +59,7 @@ private:
     std::unique_ptr<Thread<Alarm>> alarm;
 
     std::mutex mutex;
+    std::condition_variable cvEmpty;
     std::list<Runnable*> runnables;
 };
 

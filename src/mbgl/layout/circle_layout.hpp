@@ -5,6 +5,7 @@
 #include <mbgl/renderer/buckets/circle_bucket.hpp>
 #include <mbgl/renderer/render_layer.hpp>
 #include <mbgl/style/layers/circle_layer_impl.hpp>
+#include <mbgl/util/containers.hpp>
 
 namespace mbgl {
 
@@ -13,7 +14,9 @@ public:
     CircleLayout(const BucketParameters& parameters,
                  const std::vector<Immutable<style::LayerProperties>>& group,
                  std::unique_ptr<GeometryTileLayer> sourceLayer_)
-        : sourceLayer(std::move(sourceLayer_)), zoom(parameters.tileID.overscaledZ), mode(parameters.mode) {
+        : sourceLayer(std::move(sourceLayer_)),
+          zoom(parameters.tileID.overscaledZ),
+          mode(parameters.mode) {
         assert(!group.empty());
         auto leaderLayerProperties = staticImmutableCast<style::CircleLayerProperties>(group.front());
         const auto& unevaluatedLayout = leaderLayerProperties->layerImpl().layout;
@@ -52,7 +55,7 @@ public:
 
     void createBucket(const ImagePositions&,
                       std::unique_ptr<FeatureIndex>& featureIndex,
-                      std::unordered_map<std::string, LayerRenderData>& renderData,
+                      mbgl::unordered_map<std::string, LayerRenderData>& renderData,
                       const bool,
                       const bool,
                       const CanonicalTileID& canonical) override {

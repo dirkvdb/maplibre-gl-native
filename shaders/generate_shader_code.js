@@ -1,16 +1,43 @@
 #!/usr/bin/env node
 'use strict';
 
+console.log("Generating shaders...");
+
 const { ArgumentParser } = require("argparse");
 const path = require("node:path");
 const fs = require("node:fs")
 const os = require("node:os");
 
-const generatedHeader = `// Generated code, do not modify this file!
-// Generated on ${new Date().toISOString()} by ${os.userInfo().username} using shaders/generate_shader_code.js
-`;
+const generatedHeader = `// Generated code, do not modify this file!`;
 
-const pragmaMapConvert = (source, pragmaMap, pipelineStage) => {
+const newAttribLocationMapping = (source) => {
+    return {
+        __alloc: findHighestAttribLocation(source)
+    };
+}
+
+const locationForAttrib = (attribLocations, locationName) => {
+    if (attribLocations[locationName]) {
+        return attribLocations[attribLocations];
+    }
+
+    attribLocations[locationName] = ++attribLocations.__alloc;
+    return attribLocations[locationName];
+};
+
+const findHighestAttribLocation = (source) => {
+    const re = /layout\s*\(\s*location\s*=\s*(\d+)\s*\)\s*in\s+/g;
+    let match;
+    let topIndex = -1;
+
+    while (match = re.exec(source)) {
+        topIndex = Number(match[1]) > topIndex ? Number(match[1]) : topIndex;
+    }
+
+    return topIndex;
+}
+
+const pragmaMapConvert = (source, pragmaMap, attribLocations, pipelineStage) => {
     const re = /#pragma mapbox: ([\w]+) ([\w]+) ([\w]+) ([\w]+)/g;
 
     if (pipelineStage == "fragment") {
@@ -18,7 +45,7 @@ const pragmaMapConvert = (source, pragmaMap, pipelineStage) => {
             pragmaMap[name] = true;
             if (operation === 'define') {
                 return `#ifndef HAS_UNIFORM_u_${name}
-varying ${precision} ${type} ${name};
+in ${precision} ${type} ${name};
 #else
 uniform ${precision} ${type} u_${name};
 #endif`;
@@ -35,13 +62,13 @@ ${precision} ${type} ${name} = u_${name};
     return source.replace(re, (match, operation, precision, type, name) => {
         const attrType = type === 'float' ? 'vec2' : 'vec4';
         const unpackType = name.match(/color/) ? 'color' : attrType;
-        
+
         if (pragmaMap[name]) {
             if (operation === 'define') {
                 return `#ifndef HAS_UNIFORM_u_${name}
 uniform lowp float u_${name}_t;
-attribute ${precision} ${attrType} a_${name};
-varying ${precision} ${type} ${name};
+layout (location = ${locationForAttrib(attribLocations, name)}) in ${precision} ${attrType} a_${name};
+out ${precision} ${type} ${name};
 #else
 uniform ${precision} ${type} u_${name};
 #endif`;
@@ -65,9 +92,81 @@ ${precision} ${type} ${name} = u_${name};
             if (operation === 'define') {
                 return `#ifndef HAS_UNIFORM_u_${name}
 uniform lowp float u_${name}_t;
-attribute ${precision} ${attrType} a_${name};
+layout (location = ${locationForAttrib(attribLocations, name)}) in ${precision} ${attrType} a_${name};
 #else
 uniform ${precision} ${type} u_${name};
+#endif`;
+            } else /* if (operation === 'initialize') */ {
+                if (unpackType === 'vec4') {
+                    // vec4 attributes are only used for cross-faded properties, and are not packed
+                    return `#ifndef HAS_UNIFORM_u_${name}
+${precision} ${type} ${name} = a_${name};
+#else
+${precision} ${type} ${name} = u_${name};
+#endif`;
+                } else /* */{
+                    return `#ifndef HAS_UNIFORM_u_${name}
+${precision} ${type} ${name} = unpack_mix_${unpackType}(a_${name}, u_${name}_t);
+#else
+${precision} ${type} ${name} = u_${name};
+#endif`;
+                }
+            }
+        }
+    });
+};
+
+/// This variant does not emit any uniforms and instead controls access to UBOs
+const pragmaMapConvertOnlyVertexArrays = (source, pragmaMap, attribLocations, pipelineStage) => {
+    const re = /#pragma mapbox: ([\w]+) ([\w]+) ([\w]+) ([\w]+)/g;
+
+    if (pipelineStage == "fragment") {
+        return source.replace(re, (match, operation, precision, type, name) => {
+            pragmaMap[name] = true;
+            if (operation === 'define') {
+                return `#ifndef HAS_UNIFORM_u_${name}
+in ${precision} ${type} ${name};
+#endif`;
+            } else /* if (operation === 'initialize') */ {
+            return `#ifdef HAS_UNIFORM_u_${name}
+${precision} ${type} ${name} = u_${name};
+#endif`;
+            }
+        });
+    }
+
+    // else pipelineStage == "vertex"
+
+    return source.replace(re, (match, operation, precision, type, name) => {
+        const attrType = type === 'float' ? 'vec2' : 'vec4';
+        const unpackType = name.match(/color/) ? 'color' : attrType;
+
+        if (pragmaMap[name]) {
+            if (operation === 'define') {
+                return `#ifndef HAS_UNIFORM_u_${name}
+layout (location = ${locationForAttrib(attribLocations, name)}) in ${precision} ${attrType} a_${name};
+out ${precision} ${type} ${name};
+#endif`;
+            } else /* if (operation === 'initialize') */ {
+                if (unpackType === 'vec4') {
+                    // vec4 attributes are only used for cross-faded properties, and are not packed
+                    return `#ifndef HAS_UNIFORM_u_${name}
+${name} = a_${name};
+#else
+${precision} ${type} ${name} = u_${name};
+#endif`;
+                } else {
+                    return `#ifndef HAS_UNIFORM_u_${name}
+${name} = unpack_mix_${unpackType}(a_${name}, u_${name}_t);
+#else
+${precision} ${type} ${name} = u_${name};
+#endif`;
+                }
+            }
+        } else {
+            if (operation === 'define') {
+                return `#ifndef HAS_UNIFORM_u_${name}
+layout (location = ${locationForAttrib(attribLocations, name)}) in ${precision} ${attrType} a_${name};
 #endif`;
             } else /* if (operation === 'initialize') */ {
                 if (unpackType === 'vec4') {
@@ -103,14 +202,9 @@ const args = (() => {
     const parser = new ArgumentParser({
         description: "MapLibre Shader Tools"
     });
-    parser.add_argument("--input", "--i", {
-        help: "Input folder location containing shaders and the manifest JSON (Must be named 'manifest.json')",
-        required: true
-        
-    });
-    parser.add_argument("--output", "--o", {
-        help: "Output folder location",
-        required: true
+    parser.add_argument("--out", "--o", {
+        help: "Directory root to write generated code.",
+        required: false
     });
     parser.add_argument("--compress", "--c", {
         help: "Compress shader text with zlib and output byte arrays instead of strings",
@@ -126,19 +220,38 @@ const args = (() => {
 
 
 // Generate shader source headers
+const root = path.dirname(__dirname);
+const outLocation = args.out ? args.out : root;
+const shaderRoot = path.join(root, "shaders");
+const outputRoot = path.join(outLocation, "include/mbgl/shaders");
 let generatedHeaders = [];
 let shaderNames = [];
-JSON.parse(fs.readFileSync(path.join(args.input, "manifest.json")))
+
+console.log("Writing shaders to ", outputRoot);
+
+JSON.parse(fs.readFileSync(path.join(shaderRoot, "manifest.json")))
     .filter(it => typeof it == "object")
     .forEach((elem) => {
+        const fragmentSource = fs.readFileSync(path.join(shaderRoot, elem.glsl_frag), {encoding: "utf8"});
+        const vertexSource = fs.readFileSync(path.join(shaderRoot, elem.glsl_vert), {encoding: "utf8"});
+
         let pragmaMap = [];
-        const fragmentSource = fs.readFileSync(path.join(args.input, elem.glsl_frag), {encoding: "utf8"});
-        const vertexSource = fs.readFileSync(path.join(args.input, elem.glsl_vert), {encoding: "utf8"});
-        const frag = pragmaMapConvert(fragmentSource, pragmaMap, "fragment");
-        const vert = pragmaMapConvert(vertexSource, pragmaMap, "vertex");
+        let attribMap = newAttribLocationMapping(vertexSource);
+
+        const frag = elem.uses_ubos
+            ? pragmaMapConvertOnlyVertexArrays(fragmentSource, pragmaMap, attribMap, "fragment")
+            : pragmaMapConvert(fragmentSource, pragmaMap, attribMap, "fragment");
+        const vert = elem.uses_ubos
+            ? pragmaMapConvertOnlyVertexArrays(vertexSource, pragmaMap, attribMap, "vertex")
+            : pragmaMapConvert(vertexSource, pragmaMap, attribMap, "vertex");
+
+        const glRoot = path.join(outputRoot, "gl");
+        if (!fs.existsSync(glRoot)) {
+            fs.mkdirSync(glRoot, {recursive: true}); // Ensure target directory is available
+        }
 
         fs.writeFileSync(
-            path.join(args.output, elem.header + ".hpp"),
+            path.join(glRoot, elem.header + ".hpp"),
             `${generatedHeader}
 #pragma once
 #include <mbgl/shaders/shader_source.hpp>
@@ -146,7 +259,9 @@ JSON.parse(fs.readFileSync(path.join(args.input, "manifest.json")))
 namespace mbgl {
 namespace shaders {
 
-template <> struct ShaderSource<BuiltIn::${elem.name}, gfx::Backend::Type::OpenGL> {
+template <>
+struct ShaderSource<BuiltIn::${elem.name}, gfx::Backend::Type::OpenGL> {
+    static constexpr const char* name = "${elem.name}";
     static constexpr const char* vertex = R"(${args.strip ? strip(vert) : vert})";
     static constexpr const char* fragment = R"(${args.strip ? strip(frag) : frag})";
 };
@@ -160,18 +275,18 @@ template <> struct ShaderSource<BuiltIn::${elem.name}, gfx::Backend::Type::OpenG
 );
 
 // Generate the manifest
-fs.writeFileSync(path.join(args.output, "shader_manifest.hpp"),
+fs.writeFileSync(path.join(outputRoot, "shader_manifest.hpp"),
 `${generatedHeader}
 #pragma once
 #include <mbgl/shaders/shader_source.hpp>
 
-#ifdef MBGL_RENDER_BACKEND_OPENGL
+#if !MLN_RENDER_BACKEND_METAL
 ${generatedHeaders.join('\n')}
 #endif
 `);
 
 // Generate shader_source.hpp
-fs.writeFileSync(path.join(args.output, "shader_source.hpp"),
+fs.writeFileSync(path.join(outputRoot, "shader_source.hpp"),
 `${generatedHeader}
 #pragma once
 #include <mbgl/gfx/backend.hpp>
@@ -191,10 +306,13 @@ enum class BuiltIn {
 /// @tparam T One of the built-in shader types available in the BuiltIn enum
 /// @tparam The desired graphics API to request shader code for. One of
 /// gfx::Backend::Type enums.
-template <BuiltIn T, gfx::Backend::Type> struct ShaderSource;
+template <BuiltIn T, gfx::Backend::Type>
+struct ShaderSource;
 
 /// @brief A specialization of the ShaderSource template for no shader code.
-template <> struct ShaderSource<BuiltIn::None, gfx::Backend::Type::OpenGL> {
+template <>
+struct ShaderSource<BuiltIn::None, gfx::Backend::Type::OpenGL> {
+    static constexpr const char* name = "";
     static constexpr const char* vertex = "";
     static constexpr const char* fragment = "";
 };
@@ -202,3 +320,5 @@ template <> struct ShaderSource<BuiltIn::None, gfx::Backend::Type::OpenGL> {
 } // namespace shaders
 } // namespace mbgl
 `);
+
+console.log("Shaders generated!");

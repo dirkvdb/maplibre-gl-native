@@ -1,6 +1,7 @@
 #include <mbgl/test/util.hpp>
 #include <mbgl/test/fixture_log_observer.hpp>
 
+#include <mbgl/style/expression/dsl.hpp>
 #include <mbgl/style/parser.hpp>
 #include <mbgl/util/io.hpp>
 #include <mbgl/util/enum.hpp>
@@ -32,51 +33,53 @@ class StyleParserTest : public ::testing::TestWithParam<std::string> {};
 TEST_P(StyleParserTest, ParseStyle) {
     const std::string base = std::string("test/fixtures/style_parser/") + GetParam();
 
+    using namespace std::string_literals;
+    SCOPED_TRACE("Loading: "s + base);
+
+    FixtureLog log;
+
     rapidjson::GenericDocument<rapidjson::UTF8<>, rapidjson::CrtAllocator> infoDoc;
     infoDoc.Parse<0>(util::read_file(base + ".info.json").c_str());
     ASSERT_FALSE(infoDoc.HasParseError());
     ASSERT_TRUE(infoDoc.IsObject());
 
-    auto observer = new FixtureLogObserver();
-    Log::setObserver(std::unique_ptr<Log::Observer>(observer));
-
     style::Parser parser;
-    auto error = parser.parse(util::read_file(base + ".style.json"));
-
-    if (error) {
+    if (auto error = parser.parse(util::read_file(base + ".style.json"))) {
         Log::Error(Event::ParseStyle, "Failed to parse style: " + util::toString(error));
     }
 
     ASSERT_TRUE(infoDoc.IsObject());
     for (const auto& property : infoDoc.GetObject()) {
-        const std::string name { property.name.GetString(), property.name.GetStringLength() };
-        const JSValue &value = property.value;
+        const std::string name{property.name.GetString(), property.name.GetStringLength()};
+        const JSValue& value = property.value;
         ASSERT_EQ(true, value.IsObject());
 
         if (value.HasMember("log")) {
-            const JSValue &js_log = value["log"];
+            const JSValue& js_log = value["log"];
             ASSERT_EQ(true, js_log.IsArray());
             for (auto& js_entry : js_log.GetArray()) {
                 ASSERT_EQ(true, js_entry.IsArray());
                 ASSERT_GE(4u, js_entry.Size());
 
                 const uint32_t count = js_entry[rapidjson::SizeType(0)].GetUint();
-                const FixtureLogObserver::LogMessage message {
+                const FixtureLogObserver::LogMessage message{
                     *Enum<EventSeverity>::toEnum(js_entry[rapidjson::SizeType(1)].GetString()),
                     *Enum<Event>::toEnum(js_entry[rapidjson::SizeType(2)].GetString()),
                     int64_t(-1),
-                    js_entry[rapidjson::SizeType(3)].GetString()
-                };
+                    js_entry[rapidjson::SizeType(3)].GetString()};
 
 #if defined(WIN32)
                 Sleep(10);
 #endif
 
-                EXPECT_EQ(count, observer->count(message)) << "Message: " << message << std::endl;
+                SCOPED_TRACE("Checking: "s + message.msg);
+
+                const auto observedCount = log.count(message);
+                EXPECT_EQ(count, observedCount) << "Message: " << message << std::endl;
             }
         }
 
-        const auto &unchecked = observer->unchecked();
+        const auto& unchecked = log.unchecked();
         if (unchecked.size()) {
             std::cerr << "Unchecked Log Messages (" << base << "/" << name << "): " << std::endl << unchecked;
         }
@@ -109,9 +112,9 @@ static void populateNames(std::vector<std::string>& names) {
         FindClose(hFind);
     }
 #else
-    DIR *dir = opendir(style_directory.c_str());
+    DIR* dir = opendir(style_directory.c_str());
     if (dir != nullptr) {
-        for (dirent *dp = nullptr; (dp = readdir(dir)) != nullptr;) {
+        for (dirent* dp = nullptr; (dp = readdir(dir)) != nullptr;) {
             const std::string name = dp->d_name;
             testName(name);
         }
@@ -127,13 +130,71 @@ INSTANTIATE_TEST_SUITE_P(StyleParser, StyleParserTest, ::testing::ValuesIn([] {
                              return names;
                          }()));
 
+TEST(StyleParser, SpriteAsString) {
+    style::Parser parser;
+    parser.parse(R"({
+        "version": 8,
+        "sprite": "https://example.com/default/markers"
+    })");
+    auto result = &parser.sprites;
+    ASSERT_EQ(1, result->size());
+    ASSERT_EQ("https://example.com/default/markers", result->at(0).spriteURL);
+    ASSERT_EQ("default", result->at(0).id);
+}
+
+TEST(StyleParser, SpriteAsArrayEmpty) {
+    style::Parser parser;
+    parser.parse(R"({
+        "version": 8,
+        "sprite": []
+    })");
+    auto result = &parser.sprites;
+    ASSERT_EQ(0, result->size());
+}
+
+TEST(StyleParser, SpriteAsArraySingle) {
+    style::Parser parser;
+    parser.parse(R"({
+        "version": 8,
+        "sprite": [{
+            "id": "default",
+            "url": "https://example.com/default/markers"
+        }]
+    })");
+    auto result = &parser.sprites;
+    ASSERT_EQ(1, result->size());
+    ASSERT_EQ("https://example.com/default/markers", result->at(0).spriteURL);
+    ASSERT_EQ("default", result->at(0).id);
+}
+
+TEST(StyleParser, SpriteAsArrayMultiple) {
+    style::Parser parser;
+    parser.parse(R"({
+        "version": 8,
+        "sprite": [{
+            "id": "default",
+            "url": "https://example.com/default/markers"
+        },{
+            "id": "hiking",
+            "url": "https://example.com/hiking/markers"
+        }]
+    })");
+    auto result = &parser.sprites;
+    ASSERT_EQ(2, result->size());
+    ASSERT_EQ("https://example.com/default/markers", result->at(0).spriteURL);
+    ASSERT_EQ("default", result->at(0).id);
+    ASSERT_EQ("https://example.com/hiking/markers", result->at(1).spriteURL);
+    ASSERT_EQ("hiking", result->at(1).id);
+}
+
 TEST(StyleParser, FontStacks) {
     style::Parser parser;
     parser.parse(util::read_file("test/fixtures/style_parser/font_stacks.json"));
-    std::set<mbgl::FontStack> expected;
-    expected.insert(FontStack({"a"}));
-    expected.insert(FontStack({"a", "b"}));
-    expected.insert(FontStack({"a", "b", "c"}));
+    std::set<mbgl::FontStack> expected = {
+        {"a"},
+        {"a", "b"},
+        {"a", "b", "c"},
+    };
     std::set<mbgl::FontStack> result = parser.fontStacks();
     ASSERT_EQ(expected, result);
 }
@@ -235,4 +296,22 @@ TEST(StyleParser, FontStacksGetExpression) {
     })");
     auto result = parser.fontStacks();
     ASSERT_EQ(0u, result.size());
+}
+
+TEST(StyleParser, ZoomCurve) {
+    using namespace mbgl::style;
+    using namespace mbgl::style::expression;
+    using namespace mbgl::style::expression::dsl;
+
+    const auto zoomInterp = []() {
+        return interpolate(linear(), zoom(), 0.0, literal(0.0), 0.0, literal(0.0));
+    };
+
+    auto expr1 = interpolate(linear(), literal(0.0), 0.0, zoomInterp(), 0.0, zoomInterp());
+    ASSERT_TRUE(expr1);
+    ASSERT_TRUE(findZoomCurveChecked(*expr1).is<std::nullptr_t>());
+
+    auto expr2 = interpolate(linear(), zoom(), 0.0, literal(0.0), 0.0, zoomInterp());
+    ASSERT_TRUE(expr2);
+    ASSERT_TRUE(findZoomCurveChecked(*expr2).is<std::nullptr_t>());
 }

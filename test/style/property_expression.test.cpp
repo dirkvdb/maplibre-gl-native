@@ -1,12 +1,11 @@
-#include <mbgl/test/util.hpp>
-#include <mbgl/test/stub_geometry_tile_feature.hpp>
-
-#include <mbgl/style/property_expression.hpp>
 #include <mbgl/renderer/property_evaluator.hpp>
 #include <mbgl/renderer/property_evaluation_parameters.hpp>
 #include <mbgl/style/expression/dsl.hpp>
+#include <mbgl/style/expression/find_zoom_curve.hpp>
 #include <mbgl/style/expression/format_section_override.hpp>
-
+#include <mbgl/style/property_expression.hpp>
+#include <mbgl/test/stub_geometry_tile_feature.hpp>
+#include <mbgl/test/util.hpp>
 #include <mbgl/util/geojson.hpp>
 #include <mbgl/util/io.hpp>
 
@@ -18,6 +17,10 @@ using namespace mbgl::style::expression;
 using namespace mbgl::style::expression::dsl;
 
 using namespace std::string_literals;
+
+namespace std {
+using ::mbgl::operator<<;
+}
 
 static const StubGeometryTileFeature oneInteger{PropertyMap{{"property", uint64_t(1)}}};
 
@@ -35,13 +38,11 @@ float evaluate(PropertyValue<float> value, float zoom) {
     return value.evaluate(PropertyEvaluator<float>(PropertyEvaluationParameters(zoom), 0));
 }
 
-template<typename T>
+template <typename T>
 auto createOverride(expression::type::Type exprType,
                     PossiblyEvaluatedPropertyValue<T> propValue,
                     std::string propName) {
-    return std::make_unique<FormatSectionOverride<T>>(std::move(exprType),
-                                                      std::move(propValue),
-                                                      std::move(propName));
+    return std::make_unique<FormatSectionOverride<T>>(std::move(exprType), std::move(propValue), std::move(propName));
 }
 
 TEST(PropertyExpression, Constant) {
@@ -54,83 +55,112 @@ TEST(PropertyExpression, Constant) {
     EXPECT_EQ(2.0f, evaluate(PropertyValue<float>(2.0f), 22));
     EXPECT_EQ(3.8f, evaluate(PropertyValue<float>(3.8f), 22));
     EXPECT_EQ(22.0f, evaluate(PropertyValue<float>(22.0f), 22));
+
+    EXPECT_EQ(Dependency::None, PropertyValue<float>(2.0f).getDependencies());
 }
 
 TEST(PropertyExpression, Expression) {
     PropertyExpression<float> expression(interpolate(linear(), zoom(), 0.0, literal(0.0), 1.0, literal(1.0)));
     EXPECT_EQ(0.0, evaluate(expression, 0.0));
     EXPECT_EQ(0.5, evaluate(expression, 0.5));
+    EXPECT_EQ(Dependency::Zoom, expression.getDependencies());
 }
 
 TEST(PropertyExpression, Defaults) {
-    EXPECT_EQ(1.0f, PropertyExpression<float>(number(get("property")), 0.0f)
-        .evaluate(oneInteger, 2.0f));
-    EXPECT_EQ(1.0f, PropertyExpression<float>(number(get("property")), 0.0f)
-        .evaluate(oneDouble, 2.0f));
-    EXPECT_EQ(0.0f, PropertyExpression<float>(number(get("property")), 0.0f)
-        .evaluate(oneString, 2.0f));
-    EXPECT_EQ(2.0f, PropertyExpression<float>(number(get("property")))
-        .evaluate(oneString, 2.0f));
+    const PropertyExpression<float> noDefault(number(get("property")));
+    const PropertyExpression<float> withDefault(number(get("property")), 0.0f);
+    EXPECT_EQ(1.0f, withDefault.evaluate(oneInteger, 2.0f));
+    EXPECT_EQ(1.0f, withDefault.evaluate(oneDouble, 2.0f));
+    EXPECT_EQ(0.0f, withDefault.evaluate(oneString, 2.0f));
+    EXPECT_EQ(2.0f, noDefault.evaluate(oneString, 2.0f));
+
+    EXPECT_EQ(Dependency::Feature, noDefault.getDependencies());
 }
 
 TEST(PropertyExpression, ZoomInterpolation) {
-    EXPECT_EQ(40.0f, PropertyExpression<float>(
-        interpolate(linear(), zoom(),
-            0.0, interpolate(linear(), number(get("property")), 1.0, literal(24.0)),
-            1.5, interpolate(linear(), number(get("property")), 1.0, literal(36.0)),
-            3.0, interpolate(linear(), number(get("property")), 1.0, literal(48.0))
-        ), 0.0f)
-    .evaluate(2.0f, oneInteger, -1.0f)) << "Should interpolate between stops";
-    
-    EXPECT_EQ(33.0, PropertyExpression<float>(
-        interpolate(linear(), zoom(),
-            5.0, interpolate(linear(), number(get("property")), 1.0, literal(33.0)),
-            10.0, interpolate(linear(), number(get("property")), 1.0, literal(66.0))
-        ), 0.0f)
-    .evaluate(0.0f, oneInteger, -1.0f)) << "Use first stop output for input values from -inf to first stop";
-    
-    EXPECT_EQ(66.0, PropertyExpression<float>(
-        interpolate(linear(), zoom(),
-            0.0, interpolate(linear(), number(get("property")), 1.0, literal(33.0)),
-            10.0, interpolate(linear(), number(get("property")), 1.0, literal(66.0))
-        ), 0.0f)
-    .evaluate(20.0f, oneInteger, -1.0f)) << "Use last stop output for input values from last stop to +inf";
+    EXPECT_EQ(40.0f,
+              PropertyExpression<float>(interpolate(linear(),
+                                                    zoom(),
+                                                    0.0,
+                                                    interpolate(linear(), number(get("property")), 1.0, literal(24.0)),
+                                                    1.5,
+                                                    interpolate(linear(), number(get("property")), 1.0, literal(36.0)),
+                                                    3.0,
+                                                    interpolate(linear(), number(get("property")), 1.0, literal(48.0))),
+                                        0.0f)
+                  .evaluate(2.0f, oneInteger, -1.0f))
+        << "Should interpolate between stops";
 
-    EXPECT_EQ(66.0f, PropertyExpression<float>(
-        interpolate(linear(), zoom(),
-            0.0, interpolate(linear(), number(get("property")), 1.0, literal(33.0)),
-            10.0, interpolate(linear(), number(get("property")), 1.0, literal(66.0))
-        ), 0.0f)
-    .evaluate(10.0f, oneInteger, -1.0f)) << "Should interpolate TO the last stop.";
-    
-    EXPECT_EQ(33.0f, PropertyExpression<float>(
-        interpolate(linear(), zoom(),
-            0.0, interpolate(linear(), number(get("property")), 1.0, literal(33.0)),
-            10.0, interpolate(linear(), number(get("property")), 1.0, literal(66.0))
-        ), 0.0f)
-    .evaluate(0.0f, oneInteger, -1.0f)) << "Should interpolate TO the first stop";
+    EXPECT_EQ(33.0,
+              PropertyExpression<float>(interpolate(linear(),
+                                                    zoom(),
+                                                    5.0,
+                                                    interpolate(linear(), number(get("property")), 1.0, literal(33.0)),
+                                                    10.0,
+                                                    interpolate(linear(), number(get("property")), 1.0, literal(66.0))),
+                                        0.0f)
+                  .evaluate(0.0f, oneInteger, -1.0f))
+        << "Use first stop output for input values from -inf to first stop";
+
+    EXPECT_EQ(66.0,
+              PropertyExpression<float>(interpolate(linear(),
+                                                    zoom(),
+                                                    0.0,
+                                                    interpolate(linear(), number(get("property")), 1.0, literal(33.0)),
+                                                    10.0,
+                                                    interpolate(linear(), number(get("property")), 1.0, literal(66.0))),
+                                        0.0f)
+                  .evaluate(20.0f, oneInteger, -1.0f))
+        << "Use last stop output for input values from last stop to +inf";
+
+    EXPECT_EQ(66.0f,
+              PropertyExpression<float>(interpolate(linear(),
+                                                    zoom(),
+                                                    0.0,
+                                                    interpolate(linear(), number(get("property")), 1.0, literal(33.0)),
+                                                    10.0,
+                                                    interpolate(linear(), number(get("property")), 1.0, literal(66.0))),
+                                        0.0f)
+                  .evaluate(10.0f, oneInteger, -1.0f))
+        << "Should interpolate TO the last stop.";
+
+    EXPECT_EQ(33.0f,
+              PropertyExpression<float>(interpolate(linear(),
+                                                    zoom(),
+                                                    0.0,
+                                                    interpolate(linear(), number(get("property")), 1.0, literal(33.0)),
+                                                    10.0,
+                                                    interpolate(linear(), number(get("property")), 1.0, literal(66.0))),
+                                        0.0f)
+                  .evaluate(0.0f, oneInteger, -1.0f))
+        << "Should interpolate TO the first stop";
 }
 
 TEST(PropertyExpression, Issue8460) {
-    PropertyExpression<float> fn1(
-        interpolate(linear(), zoom(),
-            15.0, interpolate(linear(), number(get("property")), 1.0, literal(0.0)),
-            15.2, interpolate(linear(), number(get("property")), 1.0, literal(600.0))
-        ), 0.0f);
+    PropertyExpression<float> fn1(interpolate(linear(),
+                                              zoom(),
+                                              15.0,
+                                              interpolate(linear(), number(get("property")), 1.0, literal(0.0)),
+                                              15.2,
+                                              interpolate(linear(), number(get("property")), 1.0, literal(600.0))),
+                                  0.0f);
 
-    EXPECT_NEAR(  0.0f, fn1.evaluate(15.0f, oneInteger, -1.0f), 0.00);
+    EXPECT_NEAR(0.0f, fn1.evaluate(15.0f, oneInteger, -1.0f), 0.00);
     EXPECT_NEAR(300.0f, fn1.evaluate(15.1f, oneInteger, -1.0f), 0.01);
     EXPECT_NEAR(600.0f, fn1.evaluate(15.2f, oneInteger, -1.0f), 0.00);
     EXPECT_NEAR(600.0f, fn1.evaluate(16.0f, oneInteger, -1.0f), 0.00);
 
-    PropertyExpression<float> fn2(
-        interpolate(linear(), zoom(),
-            15.0, interpolate(linear(), number(get("property")), 1.0, literal(0.0)),
-            15.2, interpolate(linear(), number(get("property")), 1.0, literal(300.0)),
-            18.0, interpolate(linear(), number(get("property")), 1.0, literal(600.0))
-        ), 0.0f);
+    PropertyExpression<float> fn2(interpolate(linear(),
+                                              zoom(),
+                                              15.0,
+                                              interpolate(linear(), number(get("property")), 1.0, literal(0.0)),
+                                              15.2,
+                                              interpolate(linear(), number(get("property")), 1.0, literal(300.0)),
+                                              18.0,
+                                              interpolate(linear(), number(get("property")), 1.0, literal(600.0))),
+                                  0.0f);
 
-    EXPECT_NEAR(  0.0f, fn2.evaluate(15.0f, oneInteger, -1.0f), 0.00);
+    EXPECT_NEAR(0.0f, fn2.evaluate(15.0f, oneInteger, -1.0f), 0.00);
     EXPECT_NEAR(150.0f, fn2.evaluate(15.1f, oneInteger, -1.0f), 0.01);
     EXPECT_NEAR(300.0f, fn2.evaluate(15.2f, oneInteger, -1.0f), 0.00);
     EXPECT_NEAR(385.71f, fn2.evaluate(16.0f, oneInteger, -1.0f), 0.01);
@@ -140,12 +170,13 @@ TEST(PropertyExpression, Issue8460) {
 
 TEST(PropertyExpression, FormatSectionOverride) {
     using Value = expression::Value;
-    Value formattedSection =
-            std::unordered_map<std::string, Value>{ {"text-color", Value{Color::blue()}} };
+    Value formattedSection = std::unordered_map<std::string, Value>{{"text-color", Value{Color::blue()}}};
     auto ctx = expression::EvaluationContext(&oneDouble).withFormattedSection(&formattedSection);
     PossiblyEvaluatedPropertyValue<Color> constantValueRed(Color::red());
     PossiblyEvaluatedPropertyValue<Color> constantValueGreen(Color::green());
     PossiblyEvaluatedPropertyValue<Color> ddsValueRed(toColor(string(get("color"))));
+
+    EXPECT_EQ(Dependency::Feature, ddsValueRed.getDependencies());
 
     // Evaluation test
     {
@@ -154,6 +185,9 @@ TEST(PropertyExpression, FormatSectionOverride) {
         EXPECT_EQ(Color::green(), propExpr.evaluate(15.0f, oneDouble, Color()));
         EXPECT_EQ(Color::green(), propExpr.evaluate(oneDouble, Color()));
         EXPECT_EQ(Color::blue(), propExpr.evaluate(ctx));
+
+        /// Override implies a feature dependency (See `::isFeatureConstant`)
+        EXPECT_EQ(Dependency::Override | Dependency::Feature, propExpr.getDependencies());
 
         auto override2 = createOverride(expression::type::Color, ddsValueRed, "text-color");
         PropertyExpression<Color> propExprDDS(std::move(override2));
@@ -184,6 +218,8 @@ TEST(PropertyExpression, ImageExpression) {
         EXPECT_FALSE(evaluatedImage.isAvailable());
         EXPECT_EQ(evaluatedImage.id(), "airport-11"s);
 
+        EXPECT_EQ(Dependency::Image, propExpr.getDependencies());
+
         PropertyExpression<expression::Image> ddPropExpr(image(get(literal("image_name"s))));
         evaluatedImage = ddPropExpr.evaluate(oneImage, emptySet, expression::Image());
         EXPECT_FALSE(evaluatedImage.isAvailable());
@@ -201,10 +237,14 @@ TEST(PropertyExpression, ImageExpression) {
         EXPECT_TRUE(evaluatedImage.isAvailable());
         EXPECT_EQ(evaluatedImage.id(), "airport-11"s);
 
+        EXPECT_EQ(Dependency::Image, propExpr.getDependencies());
+
         PropertyExpression<expression::Image> ddPropExpr(image(get(literal("image_name"s))));
         evaluatedImage = ddPropExpr.evaluate(oneImage, availableImages, expression::Image());
         EXPECT_TRUE(evaluatedImage.isAvailable());
         EXPECT_EQ(evaluatedImage.id(), "maki-11"s);
+
+        EXPECT_EQ(Dependency::Image | Dependency::Feature, ddPropExpr.getDependencies());
 
         evaluatedImage = ddPropExpr.evaluate(emptyTileFeature, availableImages, expression::Image());
         EXPECT_FALSE(evaluatedImage.isAvailable());
@@ -221,6 +261,8 @@ TEST(PropertyExpression, ImageExpression) {
         evaluatedImage = propExpr.evaluate(18.0, emptyTileFeature, availableImages, expression::Image());
         EXPECT_TRUE(evaluatedImage.isAvailable());
         EXPECT_EQ(evaluatedImage.id(), "bicycle-15"s);
+
+        EXPECT_EQ(Dependency::Image | Dependency::Zoom, propExpr.getDependencies());
     }
 }
 
@@ -268,8 +310,10 @@ TEST(PropertyExpression, WithinExpression) {
     ASSERT_TRUE(expression);
     PropertyExpression<bool> propExpr(std::move(expression));
 
-    // evaluation test with valid geojson source but FeatureType is not Point/LineString (currently only support
-    // FeatureType::Point and FeatureType::LineString)
+    EXPECT_EQ(Dependency::Feature, propExpr.getDependencies());
+
+    // evaluation test with valid geojson source but FeatureType is not Point/LineString
+    // (currently only support FeatureType::Point and FeatureType::LineString)
     {
         // testPoly is inside polygon, but will return false
         Polygon<double> testRing{{{-9.228515625, -17.560246503294888},
@@ -293,8 +337,8 @@ TEST(PropertyExpression, WithinExpression) {
         auto geoLine1 = convertGeometry(testLine1, canonicalTileID);
         StubGeometryTileFeature lineFeature1(FeatureType::LineString, geoLine1);
 
-        auto evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&lineFeature0).withCanonicalTileID(&canonicalTileID));
+        auto evaluatedResult = propExpr.evaluate(
+            EvaluationContext(&lineFeature0).withCanonicalTileID(&canonicalTileID));
         EXPECT_TRUE(evaluatedResult);
         evaluatedResult = propExpr.evaluate(EvaluationContext(&lineFeature1).withCanonicalTileID(&canonicalTileID));
         EXPECT_FALSE(evaluatedResult);
@@ -302,7 +346,7 @@ TEST(PropertyExpression, WithinExpression) {
 
     // evaluation test with valid geojson source and valid point features
     {
-        auto getPointFeature = [&canonicalTileID](const Point<double>& testPoint) -> StubGeometryTileFeature {
+        auto getPointFeature = [&canonicalTileID](const Point<double> &testPoint) -> StubGeometryTileFeature {
             auto geoPoint = convertGeometry(testPoint, canonicalTileID);
             StubGeometryTileFeature pointFeature(FeatureType::Point, geoPoint);
             return pointFeature;
@@ -310,8 +354,8 @@ TEST(PropertyExpression, WithinExpression) {
 
         // check `within` algorithm
         auto pointFeature = getPointFeature(Point<double>(-10.72265625, -7.27529233637217));
-        auto evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&pointFeature).withCanonicalTileID(&canonicalTileID));
+        auto evaluatedResult = propExpr.evaluate(
+            EvaluationContext(&pointFeature).withCanonicalTileID(&canonicalTileID));
         EXPECT_FALSE(evaluatedResult);
 
         pointFeature = getPointFeature(Point<double>(-7.646484374999999, -12.382928338487396));
@@ -418,8 +462,8 @@ TEST(PropertyExpression, WithinExpressionAntiMeridian) {
         auto geoLine1 = convertGeometry(testLine1, canonicalTileID);
         StubGeometryTileFeature lineFeature1(FeatureType::LineString, geoLine1);
 
-        auto evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&lineFeature0).withCanonicalTileID(&canonicalTileID));
+        auto evaluatedResult = propExpr.evaluate(
+            EvaluationContext(&lineFeature0).withCanonicalTileID(&canonicalTileID));
         EXPECT_TRUE(evaluatedResult);
         evaluatedResult = propExpr.evaluate(EvaluationContext(&lineFeature1).withCanonicalTileID(&canonicalTileID));
         EXPECT_FALSE(evaluatedResult);
@@ -439,7 +483,7 @@ TEST(PropertyExpression, WithinExpressionAntiMeridian) {
         ASSERT_TRUE(expression);
         PropertyExpression<bool> propExpr(std::move(expression));
 
-        auto getPointFeature = [&canonicalTileID](const Point<double>& testPoint) -> StubGeometryTileFeature {
+        auto getPointFeature = [&canonicalTileID](const Point<double> &testPoint) -> StubGeometryTileFeature {
             auto geoPoint = convertGeometry(testPoint, canonicalTileID);
             StubGeometryTileFeature pointFeature(FeatureType::Point, geoPoint);
             return pointFeature;
@@ -447,8 +491,8 @@ TEST(PropertyExpression, WithinExpressionAntiMeridian) {
 
         // check `within` algorithm
         auto pointFeature = getPointFeature(Point<double>(177, 62.5));
-        auto evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&pointFeature).withCanonicalTileID(&canonicalTileID));
+        auto evaluatedResult = propExpr.evaluate(
+            EvaluationContext(&pointFeature).withCanonicalTileID(&canonicalTileID));
         EXPECT_TRUE(evaluatedResult);
 
         pointFeature = getPointFeature(Point<double>(180, 62.5));
@@ -517,10 +561,11 @@ TEST(PropertyExpression, DistanceExpression) {
         ASSERT_TRUE(expression);
         PropertyExpression<double> propExpr(std::move(expression));
 
-        auto evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&pointFeature).withCanonicalTileID(&canonicalTileID), invalidResult);
-        EXPECT_NEAR(491.307, evaluatedResult, 0.01);
+        EXPECT_EQ(Dependency::Feature, propExpr.getDependencies());
 
+        auto evaluatedResult = propExpr.evaluate(EvaluationContext(&pointFeature).withCanonicalTileID(&canonicalTileID),
+                                                 invalidResult);
+        EXPECT_NEAR(491.307, evaluatedResult, 0.01);
     }
 
     // Evaluation test with Point to MultiPoint distance
@@ -544,8 +589,8 @@ TEST(PropertyExpression, DistanceExpression) {
         auto geoPoint = convertGeometry(featurePoint, canonicalTileID);
         StubGeometryTileFeature feature(FeatureType::Point, geoPoint);
 
-        auto evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&feature).withCanonicalTileID(&canonicalTileID), invalidResult);
+        auto evaluatedResult = propExpr.evaluate(EvaluationContext(&feature).withCanonicalTileID(&canonicalTileID),
+                                                 invalidResult);
         EXPECT_NEAR(158.541, evaluatedResult, 0.01);
     }
 
@@ -571,8 +616,8 @@ TEST(PropertyExpression, DistanceExpression) {
         auto geoLine = convertGeometry(line, canonicalTileID);
         StubGeometryTileFeature lineFeature(FeatureType::LineString, geoLine);
 
-        auto evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&lineFeature).withCanonicalTileID(&canonicalTileID), invalidResult);
+        auto evaluatedResult = propExpr.evaluate(EvaluationContext(&lineFeature).withCanonicalTileID(&canonicalTileID),
+                                                 invalidResult);
         EXPECT_NEAR(107.211, evaluatedResult, 0.01);
     }
 
@@ -600,8 +645,8 @@ TEST(PropertyExpression, DistanceExpression) {
         auto geoLine = convertGeometry(lines, canonicalTileID);
         StubGeometryTileFeature lineFeature(FeatureType::LineString, geoLine);
 
-        auto evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&lineFeature).withCanonicalTileID(&canonicalTileID), invalidResult);
+        auto evaluatedResult = propExpr.evaluate(EvaluationContext(&lineFeature).withCanonicalTileID(&canonicalTileID),
+                                                 invalidResult);
         EXPECT_NEAR(59.845, evaluatedResult, 0.01);
     }
 
@@ -671,16 +716,16 @@ TEST(PropertyExpression, DistanceExpression) {
         ASSERT_TRUE(expression);
         PropertyExpression<double> propExpr(std::move(expression));
 
-        auto evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&lineFeature).withCanonicalTileID(&canonicalTileID), invalidResult);
+        auto evaluatedResult = propExpr.evaluate(EvaluationContext(&lineFeature).withCanonicalTileID(&canonicalTileID),
+                                                 invalidResult);
         EXPECT_NEAR(180.408, evaluatedResult, 0.01);
     }
 
     // Evaluation test with MultiPoints to MutltiLineString distance
     {
         const auto multiPoints = mbgl::util::read_file("test/fixtures/geometry_data/multi_point_2.geojson");
-        const auto multiLineFeature =
-            getFeature("multi_line_string_1.geojson", FeatureType::LineString, canonicalTileID);
+        const auto multiLineFeature = getFeature(
+            "multi_line_string_1.geojson", FeatureType::LineString, canonicalTileID);
         std::stringstream ss;
         ss << std::string(R"(["distance", )") << multiPoints << std::string(R"( ])");
         auto expression = createExpression(ss.str().c_str());
@@ -695,8 +740,8 @@ TEST(PropertyExpression, DistanceExpression) {
     // Evaluation test with LineString to MutltiLineString distance
     {
         const auto LineString1 = mbgl::util::read_file("test/fixtures/geometry_data/line_string_1.geojson");
-        const auto multiLineFeature =
-            getFeature("multi_line_string_2.geojson", FeatureType::LineString, canonicalTileID);
+        const auto multiLineFeature = getFeature(
+            "multi_line_string_2.geojson", FeatureType::LineString, canonicalTileID);
         std::stringstream ss;
         ss << std::string(R"(["distance", )") << LineString1 << std::string(R"( ])");
         auto expression = createExpression(ss.str().c_str());
@@ -711,8 +756,8 @@ TEST(PropertyExpression, DistanceExpression) {
     // Evaluation test with MultiLineString to MutltiLineString distance
     {
         const auto multiLineString1 = mbgl::util::read_file("test/fixtures/geometry_data/multi_line_string_1.geojson");
-        const auto multiLineFeature =
-            getFeature("multi_line_string_2.geojson", FeatureType::LineString, canonicalTileID);
+        const auto multiLineFeature = getFeature(
+            "multi_line_string_2.geojson", FeatureType::LineString, canonicalTileID);
         std::stringstream ss;
         ss << std::string(R"(["distance", )") << multiLineString1 << std::string(R"( ])");
         auto expression = createExpression(ss.str().c_str());
@@ -753,14 +798,14 @@ TEST(PropertyExpression, DistanceExpression) {
         ASSERT_TRUE(expression);
         PropertyExpression<double> propExpr(std::move(expression));
 
-        const auto multiLineFeature1 =
-            getFeature("multi_line_string_1.geojson", FeatureType::LineString, canonicalTileID);
+        const auto multiLineFeature1 = getFeature(
+            "multi_line_string_1.geojson", FeatureType::LineString, canonicalTileID);
         auto evaluatedResult = propExpr.evaluate(
             EvaluationContext(&multiLineFeature1).withCanonicalTileID(&canonicalTileID), invalidResult);
         EXPECT_NEAR(193.450, evaluatedResult, 0.01);
 
-        const auto multiLineFeature2 =
-            getFeature("multi_line_string_2.geojson", FeatureType::LineString, canonicalTileID);
+        const auto multiLineFeature2 = getFeature(
+            "multi_line_string_2.geojson", FeatureType::LineString, canonicalTileID);
         evaluatedResult = propExpr.evaluate(EvaluationContext(&multiLineFeature2).withCanonicalTileID(&canonicalTileID),
                                             invalidResult);
         EXPECT_NEAR(0.0, evaluatedResult, 0.01);
@@ -783,8 +828,8 @@ TEST(PropertyExpression, DistanceExpression) {
         auto geoPolygon = convertGeometry(polygon, canonicalTileID);
         StubGeometryTileFeature polygonFeature(FeatureType::Polygon, geoPolygon);
 
-        auto evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&polygonFeature).withCanonicalTileID(&canonicalTileID), invalidResult);
+        auto evaluatedResult = propExpr.evaluate(
+            EvaluationContext(&polygonFeature).withCanonicalTileID(&canonicalTileID), invalidResult);
         EXPECT_NEAR(203.876, evaluatedResult, 0.01);
     }
 
@@ -827,8 +872,8 @@ TEST(PropertyExpression, DistanceExpression) {
         auto geoPolygon1 = convertGeometry(polygon1, canonicalTileID);
         StubGeometryTileFeature polygonFeature1(FeatureType::Polygon, geoPolygon1);
 
-        auto evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&polygonFeature1).withCanonicalTileID(&canonicalTileID), invalidResult);
+        auto evaluatedResult = propExpr.evaluate(
+            EvaluationContext(&polygonFeature1).withCanonicalTileID(&canonicalTileID), invalidResult);
         EXPECT_NEAR(0.0, evaluatedResult, 0.01);
 
         // polygon2's line is intersecting polygon, but no point is inside polygon
@@ -840,8 +885,8 @@ TEST(PropertyExpression, DistanceExpression) {
         auto geoPolygon2 = convertGeometry(polygon2, canonicalTileID);
         StubGeometryTileFeature polygonFeature2(FeatureType::Polygon, geoPolygon2);
 
-        evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&polygonFeature2).withCanonicalTileID(&canonicalTileID), invalidResult);
+        evaluatedResult = propExpr.evaluate(EvaluationContext(&polygonFeature2).withCanonicalTileID(&canonicalTileID),
+                                            invalidResult);
         EXPECT_NEAR(0.0, evaluatedResult, 0.01);
 
         // one of polygon3's point is inside polygon
@@ -853,8 +898,8 @@ TEST(PropertyExpression, DistanceExpression) {
         auto geoPolygon3 = convertGeometry(polygon3, canonicalTileID);
         StubGeometryTileFeature polygonFeature3(FeatureType::Polygon, geoPolygon3);
 
-        evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&polygonFeature3).withCanonicalTileID(&canonicalTileID), invalidResult);
+        evaluatedResult = propExpr.evaluate(EvaluationContext(&polygonFeature3).withCanonicalTileID(&canonicalTileID),
+                                            invalidResult);
         EXPECT_NEAR(0.0, evaluatedResult, 0.01);
 
         // lineString1 is within polygon
@@ -862,8 +907,8 @@ TEST(PropertyExpression, DistanceExpression) {
         auto geoLineString1 = convertGeometry(lineString1, canonicalTileID);
         StubGeometryTileFeature lineFeature1(FeatureType::LineString, geoLineString1);
 
-        evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&lineFeature1).withCanonicalTileID(&canonicalTileID), invalidResult);
+        evaluatedResult = propExpr.evaluate(EvaluationContext(&lineFeature1).withCanonicalTileID(&canonicalTileID),
+                                            invalidResult);
         EXPECT_NEAR(0.0, evaluatedResult, 0.01);
 
         // lineString2 is intersecting the polygon but its points are outside the polygon
@@ -871,8 +916,8 @@ TEST(PropertyExpression, DistanceExpression) {
         auto geoLineString2 = convertGeometry(lineString2, canonicalTileID);
         StubGeometryTileFeature lineFeature2(FeatureType::LineString, geoLineString2);
 
-        evaluatedResult =
-            propExpr.evaluate(EvaluationContext(&lineFeature2).withCanonicalTileID(&canonicalTileID), invalidResult);
+        evaluatedResult = propExpr.evaluate(EvaluationContext(&lineFeature2).withCanonicalTileID(&canonicalTileID),
+                                            invalidResult);
         EXPECT_NEAR(0.0, evaluatedResult, 0.01);
     }
 }

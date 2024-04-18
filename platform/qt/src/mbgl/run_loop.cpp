@@ -1,6 +1,7 @@
 #include "run_loop_impl.hpp"
 
 #include <mbgl/actor/scheduler.hpp>
+#include <mbgl/util/monotonic_timer.hpp>
 
 #include <QCoreApplication>
 
@@ -24,14 +25,15 @@ RunLoop* RunLoop::Get() {
     return static_cast<RunLoop*>(Scheduler::GetCurrent());
 }
 
-RunLoop::RunLoop(Type type) : impl(std::make_unique<Impl>()) {
+RunLoop::RunLoop(Type type)
+    : impl(std::make_unique<Impl>()) {
     switch (type) {
-    case Type::New:
-        impl->loop = std::make_unique<QEventLoop>();
-        break;
-    case Type::Default:
-        // Use QCoreApplication::instance().
-        break;
+        case Type::New:
+            impl->loop = std::make_unique<QEventLoop>();
+            break;
+        case Type::Default:
+            // Use QCoreApplication::instance().
+            break;
     }
 
     impl->type = type;
@@ -89,6 +91,25 @@ void RunLoop::runOnce() {
     }
 }
 
+std::size_t RunLoop::waitForEmpty(std::chrono::milliseconds timeout) {
+    const auto startTime = mbgl::util::MonotonicTimer::now();
+    while (true) {
+        std::size_t remaining;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            remaining = defaultQueue.size() + highPriorityQueue.size();
+        }
+
+        const auto elapsed = mbgl::util::MonotonicTimer::now() - startTime;
+        const auto elapsedMillis = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+        if (remaining == 0 || timeout <= elapsedMillis) {
+            return remaining;
+        }
+
+        runOnce();
+    }
+}
+
 void RunLoop::addWatch(int fd, Event event, std::function<void(int, Event)>&& cb) {
     MBGL_VERIFY_THREAD(tid);
 
@@ -119,5 +140,5 @@ void RunLoop::removeWatch(int fd) {
     }
 }
 
-}
-}
+} // namespace util
+} // namespace mbgl

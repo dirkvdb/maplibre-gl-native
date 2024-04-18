@@ -5,7 +5,9 @@
 #include <mbgl/renderer/bucket_parameters.hpp>
 #include <mbgl/renderer/render_layer.hpp>
 #include <mbgl/style/expression/image.hpp>
+#include <mbgl/style/properties.hpp>
 #include <mbgl/style/layer_properties.hpp>
+#include <mbgl/util/containers.hpp>
 
 namespace mbgl {
 
@@ -18,13 +20,16 @@ public:
 
 using PatternLayerMap = std::map<std::string, PatternDependency>;
 
-class PatternFeature  {
+class PatternFeature {
 public:
     PatternFeature(std::size_t i_,
                    std::unique_ptr<GeometryTileFeature> feature_,
                    PatternLayerMap patterns_,
                    float sortKey_ = 0.0f)
-        : i(i_), feature(std::move(feature_)), patterns(std::move(patterns_)), sortKey(sortKey_) {}
+        : i(i_),
+          feature(std::move(feature_)),
+          patterns(std::move(patterns_)),
+          sortKey(sortKey_) {}
 
     friend bool operator<(const PatternFeature& lhs, const PatternFeature& rhs) { return lhs.sortKey < rhs.sortKey; }
 
@@ -95,8 +100,8 @@ public:
             const auto& evaluated = style::getEvaluated<LayerPropertiesType>(layerProperties);
             const auto& patternProperty = evaluated.template get<PatternPropertyType>();
             const auto constantPattern = patternProperty.constantOr(Faded<style::expression::Image>{"", ""});
-            // determine if layer group has any layers that use *-pattern property and add
-            // constant pattern dependencies.
+            // determine if layer group has any layers that use *-pattern
+            // property and add constant pattern dependencies.
             if (!patternProperty.isConstant()) {
                 hasPattern = true;
             } else if (!constantPattern.to.id().empty()) {
@@ -124,8 +129,9 @@ public:
                         const auto paint = static_cast<const LayerPropertiesType&>(*it->second).evaluated;
                         const auto& patternProperty = paint.template get<PatternPropertyType>();
                         if (!patternProperty.isConstant()) {
-                            // For layers with non-data-constant pattern properties, evaluate their expression and add
-                            // the patterns to the dependency vector
+                            // For layers with non-data-constant pattern
+                            // properties, evaluate their expression and add the
+                            // patterns to the dependency vector
                             const auto min = patternProperty.evaluate(*feature,
                                                                       zoom - 1,
                                                                       layoutParameters.availableImages,
@@ -166,12 +172,12 @@ public:
 
     void createBucket(const ImagePositions& patternPositions,
                       std::unique_ptr<FeatureIndex>& featureIndex,
-                      std::unordered_map<std::string, LayerRenderData>& renderData,
+                      mbgl::unordered_map<std::string, LayerRenderData>& renderData,
                       const bool /*firstLoad*/,
                       const bool /*showCollisionBoxes*/,
                       const CanonicalTileID& canonical) override {
         auto bucket = std::make_shared<BucketType>(layout, layerPropertiesMap, zoom, overscaling);
-        for (auto & patternFeature : features) {
+        for (auto& patternFeature : features) {
             const auto i = patternFeature.i;
             std::unique_ptr<GeometryTileFeature> feature = std::move(patternFeature.feature);
             const PatternLayerMap& patterns = patternFeature.patterns;
@@ -182,7 +188,7 @@ public:
         }
         if (bucket->hasData()) {
             for (const auto& pair : layerPropertiesMap) {
-                renderData.emplace(pair.first, LayerRenderData {bucket, pair.second});
+                renderData.emplace(pair.first, LayerRenderData{bucket, pair.second});
             }
         }
     };

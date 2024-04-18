@@ -1,38 +1,20 @@
-workspace(name = "Maplibre")
-
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("//platform/darwin:bazel/darwin_config_repository_rule.bzl", "darwin_config")
 
 http_archive(
-    name = "build_bazel_rules_apple",
-    sha256 = "a95d9007570cb5c6180b7e380bad2a854734209cc02390eed208efb922843c8a",
-    strip_prefix = "rules_apple-76752fe84ff0dc5d793033015647c78efbf41309",
-    url = "https://github.com/bazelbuild/rules_apple/archive/76752fe84ff0dc5d793033015647c78efbf41309.tar.gz",
+    name = "glfw",
+    build_file = "@//vendor:glfw.BUILD",
+    integrity = "sha256-tewASycS/Qjohh3CcUKPBId1IAot9xnM9XUUO6dJo+k=",
+    strip_prefix = "glfw-3.4",
+    url = "https://github.com/glfw/glfw/releases/download/3.4/glfw-3.4.zip",
 )
 
-load(
-    "@build_bazel_rules_apple//apple:repositories.bzl",
-    "apple_rules_dependencies",
+new_local_repository(
+    name = "libuv",
+    build_file = "@//vendor:libuv.BUILD",
+    path = "/opt/homebrew/opt/libuv",
 )
 
-apple_rules_dependencies()
-
-load(
-    "@build_bazel_rules_swift//swift:repositories.bzl",
-    "swift_rules_dependencies",
+darwin_config(
+    name = "darwin_config",
 )
-
-swift_rules_dependencies()
-
-load(
-    "@build_bazel_rules_swift//swift:extras.bzl",
-    "swift_rules_extra_dependencies",
-)
-
-swift_rules_extra_dependencies()
-
-load(
-    "@build_bazel_apple_support//lib:repositories.bzl",
-    "apple_support_dependencies",
-)
-
-apple_support_dependencies()

@@ -7,21 +7,21 @@
 namespace mbgl {
 namespace {
 
-vec3 toVec3(const vec4& v) {
+vec3 toVec3(const vec4& v) noexcept {
     return vec3{{v[0], v[1], v[2]}};
 }
 
-double vec4Dot(const vec4& a, const vec4& b) {
+double vec4Dot(const vec4& a, const vec4& b) noexcept {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
 }
 
 template <size_t N>
-static Point<double> ProjectPointsToAxis(const std::array<vec3, N>& points, const vec3& origin, const vec3& axis) {
+Point<double> ProjectPointsToAxis(const std::array<vec3, N>& points, const vec3& origin, const vec3& axis) noexcept {
     double min = std::numeric_limits<double>::max();
     double max = -std::numeric_limits<double>::max();
 
     for (const vec3& point : points) {
-        double projectedPoint = vec3Dot(vec3Sub(point, origin), axis);
+        const double projectedPoint = vec3Dot(vec3Sub(point, origin), axis);
         min = std::min(projectedPoint, min);
         max = std::max(projectedPoint, max);
     }
@@ -33,17 +33,21 @@ static Point<double> ProjectPointsToAxis(const std::array<vec3, N>& points, cons
 
 namespace util {
 
-AABB::AABB() : min({{0, 0, 0}}), max({{0, 0, 0}}) {}
+AABB::AABB() noexcept
+    : min({{0, 0, 0}}),
+      max({{0, 0, 0}}) {}
 
-AABB::AABB(const vec3& min_, const vec3& max_) : min(min_), max(max_) {}
+AABB::AABB(const vec3& min_, const vec3& max_) noexcept
+    : min(min_),
+      max(max_) {}
 
-vec3 AABB::closestPoint(const vec3& point) const {
+constexpr vec3 AABB::closestPoint(const vec3& point) const noexcept {
     return {{std::max(std::min(max[0], point[0]), min[0]),
              std::max(std::min(max[1], point[1]), min[1]),
              std::max(std::min(max[2], point[2]), min[2])}};
 }
 
-vec3 AABB::distanceXYZ(const vec3& point) const {
+vec3 AABB::distanceXYZ(const vec3& point) const noexcept {
     vec3 vec = vec3Sub(closestPoint(point), point);
 
     vec[0] = std::abs(vec[0]);
@@ -53,15 +57,16 @@ vec3 AABB::distanceXYZ(const vec3& point) const {
     return vec;
 }
 
-AABB AABB::quadrant(int idx) const {
+AABB AABB::quadrant(int idx) const noexcept {
     assert(idx >= 0 && idx < 4);
     vec3 quadrantMin = min;
     vec3 quadrantMax = max;
     const double xCenter = 0.5 * (max[0] + min[0]);
     const double yCenter = 0.5 * (max[1] + min[1]);
 
-    // This aabb is split into 4 quadrants. For each axis define in which side of the split "idx" is
-    // The result for indices 0, 1, 2, 3 is: { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 }
+    // This aabb is split into 4 quadrants. For each axis define in which side
+    // of the split "idx" is The result for indices 0, 1, 2, 3 is: { 0, 0 }, {
+    // 1, 0 }, { 0, 1 }, { 1, 1 }
     const std::array<int, 4> xSplit = {{0, 1, 0, 1}};
     const std::array<int, 4> ySplit = {{0, 0, 1, 1}};
 
@@ -74,18 +79,18 @@ AABB AABB::quadrant(int idx) const {
     return {quadrantMin, quadrantMax};
 }
 
-bool AABB::intersects(const AABB& aabb) const {
+bool AABB::intersects(const AABB& aabb) const noexcept {
     if (min[0] > aabb.max[0] || aabb.min[0] > max[0]) return false;
     if (min[1] > aabb.max[1] || aabb.min[1] > max[1]) return false;
     if (min[2] > aabb.max[2] || aabb.min[2] > max[2]) return false;
     return true;
 }
 
-bool AABB::operator==(const AABB& aabb) const {
+bool AABB::operator==(const AABB& aabb) const noexcept {
     return min == aabb.min && max == aabb.max;
 }
 
-bool AABB::operator!=(const AABB& aabb) const {
+bool AABB::operator!=(const AABB& aabb) const noexcept {
     return !(*this == aabb);
 }
 
@@ -102,15 +107,17 @@ enum {
 };
 
 Frustum::Frustum(const std::array<vec3, 8>& points_, const std::array<vec4, 6>& planes_)
-    : points(points_), planes(planes_) {
+    : points(points_),
+      planes(planes_) {
     const Point<double> xBounds = ProjectPointsToAxis(points, {{0, 0, 0}}, {{1, 0, 0}});
     const Point<double> yBounds = ProjectPointsToAxis(points, {{0, 0, 0}}, {{0, 1, 0}});
     const Point<double> zBounds = ProjectPointsToAxis(points, {{0, 0, 0}}, {{0, 0, 1}});
 
     bounds = AABB({{xBounds.x, yBounds.x, zBounds.x}}, {{xBounds.y, yBounds.y, zBounds.y}});
 
-    // Precompute a set of separating axis candidates for precise intersection tests.
-    // Remaining axes not covered in basic intersection tests are: axis[] = (edges of aabb) x (edges of frustum)
+    // Precompute a set of separating axis candidates for precise intersection
+    // tests. Remaining axes not covered in basic intersection tests are: axis[]
+    // = (edges of aabb) x (edges of frustum)
     std::array<vec3, 6> frustumEdges = {{vec3Sub(points[near_br], points[near_bl]),
                                          vec3Sub(points[near_tl], points[near_bl]),
                                          vec3Sub(points[far_tl], points[near_tl]),
@@ -206,13 +213,15 @@ IntersectionResult Frustum::intersects(const AABB& aabb) const {
 
     bool fullyInside = true;
 
+    const auto epsilon = 1e-10;
+
     for (const vec4& plane : planes) {
         size_t pointsInside = 0;
 
-        pointsInside += vec4Dot(plane, aabbPoints[0]) >= 0.0;
-        pointsInside += vec4Dot(plane, aabbPoints[1]) >= 0.0;
-        pointsInside += vec4Dot(plane, aabbPoints[2]) >= 0.0;
-        pointsInside += vec4Dot(plane, aabbPoints[3]) >= 0.0;
+        pointsInside += vec4Dot(plane, aabbPoints[0]) >= -epsilon;
+        pointsInside += vec4Dot(plane, aabbPoints[1]) >= -epsilon;
+        pointsInside += vec4Dot(plane, aabbPoints[2]) >= -epsilon;
+        pointsInside += vec4Dot(plane, aabbPoints[3]) >= -epsilon;
 
         if (!pointsInside) {
             // Separating axis found, no intersection

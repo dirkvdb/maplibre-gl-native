@@ -12,7 +12,9 @@ namespace style {
 
 class VectorSource final : public Source {
 public:
-    VectorSource(std::string id, variant<std::string, Tileset> urlOrTileset, std::optional<float> maxZoom = std::nullopt,
+    VectorSource(std::string id,
+                 variant<std::string, Tileset> urlOrTileset,
+                 std::optional<float> maxZoom = std::nullopt,
                  std::optional<float> minZoom = std::nullopt);
     ~VectorSource() final;
 
@@ -24,11 +26,17 @@ public:
 
     void loadDescription(FileSource&) final;
 
+    /// @brief Gets the tile urls for this vector source.
+    /// @return List of tile urls.
+    const std::vector<std::string> getTiles() const;
+
+    /// @brief Sets the tile urls for this vector source.
+    /// @param tiles List of tile urls.
+    void setTiles(const std::vector<std::string>& tiles);
+
     bool supportsLayerType(const mbgl::style::LayerTypeInfo*) const override;
 
-    mapbox::base::WeakPtr<Source> makeWeakPtr() override {
-        return weakFactory.makeWeakPtr();
-    }
+    mapbox::base::WeakPtr<Source> makeWeakPtr() override { return weakFactory.makeWeakPtr(); }
 
 protected:
     Mutable<Source::Impl> createMutable() const noexcept final;
@@ -36,7 +44,7 @@ protected:
 private:
     const variant<std::string, Tileset> urlOrTileset;
     std::unique_ptr<AsyncRequest> req;
-    mapbox::base::WeakPtrFactory<Source> weakFactory {this};
+    mapbox::base::WeakPtrFactory<Source> weakFactory{this};
     std::optional<float> maxZoom;
     std::optional<float> minZoom;
 };

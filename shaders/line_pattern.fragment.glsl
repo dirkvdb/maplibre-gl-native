@@ -5,20 +5,19 @@ uniform mediump vec4 u_scale;
 
 uniform sampler2D u_image;
 
-varying vec2 v_normal;
-varying vec2 v_width2;
-varying float v_linesofar;
-varying float v_gamma_scale;
+in vec2 v_normal;
+in vec2 v_width2;
+in float v_linesofar;
+in float v_gamma_scale;
 
-#pragma mapbox: define lowp vec4 pattern_from
-#pragma mapbox: define lowp vec4 pattern_to
+#pragma mapbox: define mediump vec4 pattern_from
+#pragma mapbox: define mediump vec4 pattern_to
 #pragma mapbox: define lowp float blur
 #pragma mapbox: define lowp float opacity
 
 void main() {
     #pragma mapbox: initialize mediump vec4 pattern_from
     #pragma mapbox: initialize mediump vec4 pattern_to
-
     #pragma mapbox: initialize lowp float blur
     #pragma mapbox: initialize lowp float opacity
 
@@ -60,11 +59,11 @@ void main() {
     vec2 pos_a = mix(pattern_tl_a / u_texsize, pattern_br_a / u_texsize, vec2(x_a, y_a));
     vec2 pos_b = mix(pattern_tl_b / u_texsize, pattern_br_b / u_texsize, vec2(x_b, y_b));
 
-    vec4 color = mix(texture2D(u_image, pos_a), texture2D(u_image, pos_b), u_fade);
+    vec4 color = mix(texture(u_image, pos_a), texture(u_image, pos_b), u_fade);
 
-    gl_FragColor = color * alpha * opacity;
+    fragColor = color * alpha * opacity;
 
 #ifdef OVERDRAW_INSPECTOR
-    gl_FragColor = vec4(1.0);
+    fragColor = vec4(1.0);
 #endif
 }

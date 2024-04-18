@@ -8,7 +8,11 @@ namespace mbgl {
 namespace style {
 namespace expression {
 
-EvaluationResult toBoolean(const Value& v) {
+using CoerceFunction = EvaluationResult (*)(const Value&);
+
+namespace {
+
+EvaluationResult toBoolean(const Value& v) noexcept {
     return v.match([&](double f) { return static_cast<bool>(f); },
                    [&](const std::string& s) { return s.length() > 0; },
                    [&](bool b) { return b; },
@@ -18,67 +22,54 @@ EvaluationResult toBoolean(const Value& v) {
 }
 
 EvaluationResult toNumber(const Value& v) {
-    std::optional<double> result = v.match(
-        [](NullValue) -> std::optional<double> { return 0.0; },
-        [](const double f) -> std::optional<double> { return f; },
-        [](const std::string& s) -> std::optional<double> {
-            try {
-                return util::stof(s);
-            } catch (...) {
-                return {};
-            }
-        },
-        [](const auto&) { return std::optional<double>(); }
-    );
+    std::optional<double> result = v.match([](NullValue) -> std::optional<double> { return 0.0; },
+                                           [](const double f) -> std::optional<double> { return f; },
+                                           [](const std::string& s) -> std::optional<double> {
+                                               try {
+                                                   return util::stof(s);
+                                               } catch (...) {
+                                                   return {};
+                                               }
+                                           },
+                                           [](const auto&) { return std::optional<double>(); });
     if (!result) {
-        return EvaluationError {
-            "Could not convert " + stringify(v) + " to number."
-        };
+        return EvaluationError{"Could not convert " + stringify(v) + " to number."};
     }
     return *result;
 }
 
 EvaluationResult toColor(const Value& colorValue) {
     return colorValue.match(
-        [&](const Color& color) -> EvaluationResult {
-            return color;
-        },
+        [&](const Color& color) -> EvaluationResult { return color; },
         [&](const std::string& colorString) -> EvaluationResult {
             const std::optional<Color> result = Color::parse(colorString);
             if (result) {
                 return *result;
             } else {
-                return EvaluationError{
-                    "Could not parse color from value '" + colorString + "'"
-                };
+                return EvaluationError{"Could not parse color from value '" + colorString + "'"};
             }
         },
         [&colorValue](const std::vector<Value>& components) -> EvaluationResult {
-            std::size_t len = components.size();
+            const std::size_t len = components.size();
             bool isNumeric = std::all_of(components.begin(), components.end(), [](const Value& item) -> bool {
                 return item.template is<double>();
             });
             if ((len == 3 || len == 4) && isNumeric) {
-                Result<Color> c = {rgba(
-                    components[0].template get<double>(),
-                    components[1].template get<double>(),
-                    components[2].template get<double>(),
-                    len == 4 ? components[3].template get<double>() : 1.0
-                )};
+                Result<Color> c = {rgba(components[0].template get<double>(),
+                                        components[1].template get<double>(),
+                                        components[2].template get<double>(),
+                                        len == 4 ? components[3].template get<double>() : 1.0)};
                 if (!c) return c.error();
                 return *c;
             } else {
-                return EvaluationError{
-                    "Invalid rbga value " + stringify(colorValue) + ": expected an array containing either three or four numeric values."
-                };
+                return EvaluationError{"Invalid rbga value " + stringify(colorValue) +
+                                       ": expected an array containing either three or four "
+                                       "numeric values."};
             }
         },
         [&](const auto&) -> EvaluationResult {
-            return EvaluationError{
-                "Could not parse color from value '" + stringify(colorValue) + "'"
-            };
-        }
-    );
+            return EvaluationError{"Could not parse color from value '" + stringify(colorValue) + "'"};
+        });
 }
 
 EvaluationResult toFormatted(const Value& formattedValue) {
@@ -89,34 +80,47 @@ EvaluationResult toImage(const Value& imageValue) {
     return Image(toString(imageValue).c_str());
 }
 
-Coercion::Coercion(type::Type type_, std::vector<std::unique_ptr<Expression>> inputs_) :
-    Expression(Kind::Coercion, std::move(type_)),
-    inputs(std::move(inputs_))
-{
-    assert(!inputs.empty());
-    type::Type t = getType();
+EvaluationResult toStringValue(const Value& imageValue) {
+    return toString(imageValue);
+}
+
+CoerceFunction getCoerceFunction(const type::Type& t) {
     if (t.is<type::BooleanType>()) {
-        coerceSingleValue = toBoolean;
+        return toBoolean;
     } else if (t.is<type::ColorType>()) {
-        coerceSingleValue = toColor;
+        return toColor;
     } else if (t.is<type::NumberType>()) {
-        coerceSingleValue = toNumber;
+        return toNumber;
     } else if (t.is<type::StringType>()) {
-        coerceSingleValue = [] (const Value& v) -> EvaluationResult { return toString(v); };
+        return toStringValue;
     } else if (t.is<type::FormattedType>()) {
-        coerceSingleValue = toFormatted;
+        return toFormatted;
     } else if (t.is<type::ImageType>()) {
-        coerceSingleValue = toImage;
-    } else {
-        assert(false);
+        return toImage;
     }
+    assert(false);
+    return toStringValue;
+}
+
+Dependency extraDependency(const type::Type& t) {
+    return t.is<type::ImageType>() ? Dependency::Image : Dependency::None;
+}
+
+} // namespace
+
+Coercion::Coercion(const type::Type& type_, std::vector<std::unique_ptr<Expression>> inputs_)
+    : Expression(Kind::Coercion, type_, collectDependencies(inputs_) | extraDependency(type_)),
+      coerceSingleValue(getCoerceFunction(getType())),
+      inputs(std::move(inputs_)) {
+    assert(!inputs.empty());
 }
 
 mbgl::Value Coercion::serialize() const {
     if (getType().is<type::FormattedType>()) {
-        // Since there's no explicit "to-formatted" coercion, the only coercions should be created
-        // by string expressions that get implicitly coerced to "formatted".
-        std::vector<mbgl::Value> serialized{{ std::string("format") }};
+        // Since there's no explicit "to-formatted" coercion, the only coercions
+        // should be created by string expressions that get implicitly coerced
+        // to "formatted".
+        std::vector<mbgl::Value> serialized{{std::string("format")}};
         serialized.push_back(inputs[0]->serialize());
         serialized.emplace_back(std::unordered_map<std::string, mbgl::Value>());
         return serialized;
@@ -126,24 +130,25 @@ mbgl::Value Coercion::serialize() const {
         return Expression::serialize();
     }
 };
-    
+
 std::string Coercion::getOperator() const {
-    return getType().match(
-      [](const type::BooleanType&) { return "to-boolean"; },
-      [](const type::ColorType&) { return "to-color"; },
-      [](const type::NumberType&) { return "to-number"; },
-      [](const type::StringType&) { return "to-string"; },
-      [](const auto&) { assert(false); return ""; });
+    auto s = getType().match([](const type::BooleanType&) -> std::string_view { return "to-boolean"; },
+                             [](const type::ColorType&) -> std::string_view { return "to-color"; },
+                             [](const type::NumberType&) -> std::string_view { return "to-number"; },
+                             [](const type::StringType&) -> std::string_view { return "to-string"; },
+                             [](const auto&) noexcept -> std::string_view {
+                                 assert(false);
+                                 return "";
+                             });
+    return std::string(s);
 }
 
 using namespace mbgl::style::conversion;
 ParseResult Coercion::parse(const Convertible& value, ParsingContext& ctx) {
-    static std::unordered_map<std::string, type::Type> types {
-        {"to-boolean", type::Boolean},
-        {"to-color", type::Color},
-        {"to-number", type::Number},
-        {"to-string", type::String}
-    };
+    static std::unordered_map<std::string, type::Type> types{{"to-boolean", type::Boolean},
+                                                             {"to-color", type::Color},
+                                                             {"to-number", type::Number},
+                                                             {"to-string", type::String}};
 
     std::size_t length = arrayLength(value);
 
@@ -164,8 +169,8 @@ ParseResult Coercion::parse(const Convertible& value, ParsingContext& ctx) {
 
     /**
      * Special form for error-coalescing coercion expressions "to-number",
-     * "to-color".  Since these coercions can fail at runtime, they accept multiple
-     * arguments, only evaluating one at a time until one succeeds.
+     * "to-color".  Since these coercions can fail at runtime, they accept
+     * multiple arguments, only evaluating one at a time until one succeeds.
      */
 
     std::vector<std::unique_ptr<Expression>> parsed;
@@ -190,18 +195,18 @@ EvaluationResult Coercion::evaluate(const EvaluationContext& params) const {
     }
 
     assert(false);
-    return EvaluationError { "Unreachable" };
+    return EvaluationError{"Unreachable"};
 };
 
 void Coercion::eachChild(const std::function<void(const Expression&)>& visit) const {
-    for(const std::unique_ptr<Expression>& input : inputs) {
+    for (const std::unique_ptr<Expression>& input : inputs) {
         visit(*input);
     }
 };
 
-bool Coercion::operator==(const Expression& e) const {
+bool Coercion::operator==(const Expression& e) const noexcept {
     if (e.getKind() == Kind::Coercion) {
-        auto rhs = static_cast<const Coercion*>(&e);
+        const auto* rhs = static_cast<const Coercion*>(&e);
         return getType() == rhs->getType() && Expression::childrenEqual(inputs, rhs->inputs);
     }
     return false;

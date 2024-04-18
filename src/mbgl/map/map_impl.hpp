@@ -20,12 +20,11 @@ class ResourceTransform;
 
 namespace gfx {
 class ShaderRegistry;
-}
+} // namespace gfx
 
 struct StillImageRequest {
     StillImageRequest(Map::StillImageCallback&& callback_)
-        : callback(std::move(callback_)) {
-    }
+        : callback(std::move(callback_)) {}
 
     Map::StillImageCallback callback;
 };
@@ -46,7 +45,7 @@ public:
     void onInvalidate() final;
     void onResourceError(std::exception_ptr) final;
     void onWillStartRenderingFrame() final;
-    void onDidFinishRenderingFrame(RenderMode, bool, bool) final;
+    void onDidFinishRenderingFrame(RenderMode, bool, bool, double, double) final;
     void onWillStartRenderingMap() final;
     void onDidFinishRenderingMap() final;
     void onStyleImageMissing(const std::string&, const std::function<void()>&) final;
@@ -65,7 +64,7 @@ public:
     const float pixelRatio;
     const bool crossSourceCollisions;
 
-    MapDebugOptions debugOptions { MapDebugOptions::NoDebug };
+    MapDebugOptions debugOptions{MapDebugOptions::NoDebug};
 
     std::shared_ptr<FileSource> fileSource;
 

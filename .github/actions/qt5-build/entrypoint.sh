@@ -1,6 +1,6 @@
 #!/bin/bash -l
 
-source scl_source enable devtoolset-8 rh-git218
+source scl_source enable devtoolset-11 rh-git218
 
 set -e
 set -x
@@ -14,9 +14,6 @@ cmake ../source/ \
   -DCMAKE_BUILD_TYPE="Release" \
   -DCMAKE_C_COMPILER_LAUNCHER="ccache" \
   -DCMAKE_CXX_COMPILER_LAUNCHER="ccache" \
-  -DCMAKE_INSTALL_PREFIX=../install \
-  -DMBGL_WITH_QT=ON \
-  -DMBGL_QT_DEPLOYMENT=ON \
-  -DMBGL_QT_LIBRARY_ONLY=ON
+  -DMLN_WITH_QT=ON \
+  -DMLN_QT_IGNORE_ICU=OFF
 ninja
-ninja install

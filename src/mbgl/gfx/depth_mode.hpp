@@ -10,11 +10,15 @@ class DepthMode {
 public:
     DepthFunctionType func;
     DepthMaskType mask;
+#if MLN_RENDER_BACKEND_OPENGL
     Range<float> range;
+#endif
 
-    static DepthMode disabled() {
-       return DepthMode { DepthFunctionType::Always, DepthMaskType::ReadOnly, { 0.0, 1.0 } };
-    }
+#if MLN_RENDER_BACKEND_OPENGL
+    static DepthMode disabled() { return DepthMode{DepthFunctionType::Always, DepthMaskType::ReadOnly, {0.0, 1.0}}; }
+#else
+    static DepthMode disabled() { return DepthMode{DepthFunctionType::Always, DepthMaskType::ReadOnly}; }
+#endif
 };
 
 } // namespace gfx

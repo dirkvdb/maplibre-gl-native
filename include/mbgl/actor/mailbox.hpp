@@ -1,5 +1,5 @@
 #pragma once
-
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -14,13 +14,12 @@ class Message;
 
 class Mailbox : public std::enable_shared_from_this<Mailbox> {
 public:
-   
     /// Create a "holding" mailbox, messages to which will remain queued,
     /// unconsumed, until the mailbox is associated with a Scheduler using
     /// start(). This allows a Mailbox object to be created on one thread and
     /// later transferred to a different target thread that may not yet exist.
     Mailbox();
-    
+
     Mailbox(Scheduler&);
 
     /// Attach the given scheduler to this mailbox and begin processing messages
@@ -28,6 +27,9 @@ public:
     /// default constructor Mailbox().
     void open(Scheduler& scheduler_);
     void close();
+
+    // Indicate this mailbox will no longer be checked for messages
+    void abandon();
 
     bool isOpen() const;
 
@@ -38,12 +40,19 @@ public:
     static std::function<void()> makeClosure(std::weak_ptr<Mailbox>);
 
 private:
+    enum class State : uint32_t {
+        Idle = 0,
+        Processing,
+        Abandoned
+    };
+
     mapbox::base::WeakPtr<Scheduler> weakScheduler;
 
     std::recursive_mutex receivingMutex;
     std::mutex pushingMutex;
 
-    bool closed { false };
+    std::atomic<State> state{State::Idle};
+    bool closed{false};
 
     std::mutex queueMutex;
     std::queue<std::unique_ptr<Message>> queue;

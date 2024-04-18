@@ -14,8 +14,14 @@ namespace mbgl {
 
 class Tileset {
 public:
-    enum class Scheme : bool { XYZ, TMS };
-    enum class DEMEncoding : bool { Mapbox, Terrarium };
+    enum class Scheme : bool {
+        XYZ,
+        TMS
+    };
+    enum class DEMEncoding : bool {
+        Mapbox,
+        Terrarium
+    };
 
     std::vector<std::string> tiles;
     Range<uint8_t> zoomRange;
@@ -38,14 +44,12 @@ public:
 
     // TileJSON also includes center and zoom but they are not used by mbgl.
 
-    friend bool operator==(const Tileset& lhs, const Tileset& rhs) {
-        return std::tie(lhs.tiles, lhs.zoomRange, lhs.attribution, lhs.scheme, lhs.bounds)
-            == std::tie(rhs.tiles, rhs.zoomRange, rhs.attribution, rhs.scheme, rhs.bounds);
+    friend bool operator==(const Tileset& lhs, const Tileset& rhs) noexcept {
+        return std::tie(lhs.tiles, lhs.zoomRange, lhs.attribution, lhs.scheme, lhs.bounds) ==
+               std::tie(rhs.tiles, rhs.zoomRange, rhs.attribution, rhs.scheme, rhs.bounds);
     }
 
-    friend bool operator!=(const Tileset& lhs, const Tileset& rhs) {
-        return !(lhs == rhs);
-    }
+    friend bool operator!=(const Tileset& lhs, const Tileset& rhs) noexcept { return !(lhs == rhs); }
 };
 
 } // namespace mbgl

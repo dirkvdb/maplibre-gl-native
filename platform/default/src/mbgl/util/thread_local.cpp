@@ -20,8 +20,8 @@ ThreadLocalBase::ThreadLocalBase() {
 }
 
 ThreadLocalBase::~ThreadLocalBase() {
-    // ThreadLocal will not take ownership of the pointer it is managing. The pointer
-    // needs to be explicitly cleared before we destroy this object.
+    // ThreadLocal will not take ownership of the pointer it is managing. The
+    // pointer needs to be explicitly cleared before we destroy this object.
     assert(!get());
 
     if (pthread_key_delete(reinterpret_cast<pthread_key_t&>(storage)) != 0) {
@@ -30,8 +30,8 @@ ThreadLocalBase::~ThreadLocalBase() {
     }
 }
 
-void* ThreadLocalBase::get() {
-    return pthread_getspecific(reinterpret_cast<pthread_key_t&>(storage));
+void* ThreadLocalBase::get() const {
+    return pthread_getspecific(reinterpret_cast<const pthread_key_t&>(storage));
 }
 
 void ThreadLocalBase::set(void* ptr) {

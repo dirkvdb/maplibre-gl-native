@@ -20,18 +20,17 @@ void Any::eachChild(const std::function<void(const Expression&)>& visit) const {
     }
 }
 
-bool Any::operator==(const Expression& e) const {
+bool Any::operator==(const Expression& e) const noexcept {
     if (e.getKind() == Kind::Any) {
-        auto rhs = static_cast<const Any*>(&e);
+        const auto* rhs = static_cast<const Any*>(&e);
         return Expression::childrenEqual(inputs, rhs->inputs);
     }
     return false;
 }
 
 std::vector<std::optional<Value>> Any::possibleOutputs() const {
-    return {{ true }, { false }};
+    return {{true}, {false}};
 }
-
 
 EvaluationResult All::evaluate(const EvaluationContext& params) const {
     for (const auto& input : inputs) {
@@ -48,38 +47,37 @@ void All::eachChild(const std::function<void(const Expression&)>& visit) const {
     }
 }
 
-bool All::operator==(const Expression& e) const {
+bool All::operator==(const Expression& e) const noexcept {
     if (e.getKind() == Kind::All) {
-        auto rhs = static_cast<const All*>(&e);
+        const auto* rhs = static_cast<const All*>(&e);
         return Expression::childrenEqual(inputs, rhs->inputs);
     }
     return false;
 }
 
 std::vector<std::optional<Value>> All::possibleOutputs() const {
-    return {{ true }, { false }};
+    return {{true}, {false}};
 }
 
 using namespace mbgl::style::conversion;
 
 template <class T>
 ParseResult parseBooleanOp(const Convertible& value, ParsingContext& ctx) {
-    
     assert(isArray(value));
     auto length = arrayLength(value);
- 
+
     std::vector<std::unique_ptr<Expression>> parsedInputs;
-    
+
     parsedInputs.reserve(length - 1);
     for (std::size_t i = 1; i < length; i++) {
         auto parsed = ctx.parse(arrayMember(value, i), i, {type::Boolean});
         if (!parsed) {
             return parsed;
         }
-        
+
         parsedInputs.push_back(std::move(*parsed));
     }
- 
+
     return ParseResult(std::make_unique<T>(std::move(parsedInputs)));
 }
 
@@ -91,8 +89,6 @@ ParseResult All::parse(const Convertible& value, ParsingContext& ctx) {
     return parseBooleanOp<All>(value, ctx);
 }
 
-
 } // namespace expression
 } // namespace style
 } // namespace mbgl
-

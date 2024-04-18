@@ -15,13 +15,18 @@ struct ShapedTextOrientations {
     Shaping horizontal;
     Shaping vertical;
     // The following are used with variable text placement on.
-    Shaping& right = horizontal; 
+    Shaping& right = horizontal;
     Shaping center;
     Shaping left;
     bool singleLine = false;
 };
 
-enum class SymbolContent : uint8_t { None = 0, Text = 1 << 0, IconRGBA = 1 << 1, IconSDF = 1 << 2 };
+enum class SymbolContent : uint8_t {
+    None = 0,
+    Text = 1 << 0,
+    IconRGBA = 1 << 1,
+    IconSDF = 1 << 2
+};
 
 struct SymbolInstanceSharedData {
     SymbolInstanceSharedData(GeometryCoordinates line,
@@ -108,7 +113,6 @@ public:
     std::array<float, 2> textOffset;
     std::array<float, 2> iconOffset;
     std::u16string key;
-    bool isDuplicate;
     std::optional<size_t> placedRightTextIndex;
     std::optional<size_t> placedCenterTextIndex;
     std::optional<size_t> placedLeftTextIndex;

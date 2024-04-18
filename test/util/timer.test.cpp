@@ -1,35 +1,43 @@
 #include <mbgl/test/util.hpp>
 
 #include <mbgl/util/chrono.hpp>
-#include <mbgl/util/timer.hpp>
+#include <mbgl/util/monotonic_timer.hpp>
 #include <mbgl/util/run_loop.hpp>
+#include <mbgl/util/string.hpp>
+#include <mbgl/util/timer.hpp>
 
 #include <memory>
+#include <optional>
 
 using namespace mbgl::util;
 
 TEST(Timer, TEST_REQUIRES_ACCURATE_TIMING(Basic)) {
     RunLoop loop;
 
+    const auto interval = mbgl::Milliseconds(300);
+    const auto expectedTotalTime = interval;
+
+    const auto first = MonotonicTimer::now();
+    const auto elapsed = [=] {
+        return std::chrono::duration_cast<mbgl::Milliseconds>(MonotonicTimer::now() - first);
+    };
+    std::optional<mbgl::Milliseconds> callbackTime;
+    auto callback = [&] {
+        callbackTime = elapsed();
+        loop.stop();
+    };
+
     Timer timer;
-
-    auto callback = [&loop] { loop.stop(); };
-
-    auto interval = mbgl::Milliseconds(300);
-    auto expectedTotalTime = interval;
-
-    auto first = mbgl::Clock::now();
-    timer.start(interval, mbgl::Duration::zero(), callback);
+    timer.start(interval, mbgl::Duration::zero(), std::move(callback));
 
     loop.run();
 
-    auto totalTime = std::chrono::duration_cast<mbgl::Milliseconds>(mbgl::Clock::now() - first);
+    const auto totalTime = elapsed();
 
-    // These are not high precision timers. Especially libuv uses
-    // cached time from the beginning of of the main loop iteration
-    // and it is very prone to fire earlier, which is, odd.
-    EXPECT_GE(totalTime, expectedTotalTime * 0.8);
-    EXPECT_LE(totalTime, expectedTotalTime * 1.2);
+    SCOPED_TRACE("Timer callback: " + (callbackTime ? toString(callbackTime->count()) : "(never)"));
+
+    EXPECT_GE(totalTime.count(), (expectedTotalTime * 0.99).count());
+    EXPECT_LE(totalTime.count(), (expectedTotalTime * 1.10).count());
 }
 
 TEST(Timer, TEST_REQUIRES_ACCURATE_TIMING(Repeat)) {
@@ -131,9 +139,10 @@ TEST(Timer, TEST_REQUIRES_ACCURATE_TIMING(DestroyShouldStop)) {
 }
 
 TEST(Timer, TEST_REQUIRES_ACCURATE_TIMING(StoppedDuringExpiration)) {
-    // The idea is to have original timer cancellation and expiration roughly at the same time.
-    // In this case some timer backens (e.g. asio::high_resolution_timer)
-    // may call the expiration callback with good status while the timer may not expect it.
+    // The idea is to have original timer cancellation and expiration roughly at
+    // the same time. In this case some timer backens (e.g.
+    // asio::high_resolution_timer) may call the expiration callback with good
+    // status while the timer may not expect it.
 
     RunLoop loop;
 
@@ -173,7 +182,9 @@ TEST(Timer, TEST_REQUIRES_ACCURATE_TIMING(StoppedAfterExpiration)) {
 
     bool callbackFired = false;
 
-    auto timerCallback = [&] { callbackFired = true; };
+    auto timerCallback = [&] {
+        callbackFired = true;
+    };
 
     auto first = mbgl::Clock::now();
 
@@ -204,7 +215,7 @@ TEST(Timer, TEST_REQUIRES_ACCURATE_TIMING(StartOverrides)) {
 
     auto interval1 = mbgl::Milliseconds(50);
     auto interval2 = mbgl::Milliseconds(250);
-    auto expectedTotalTime = interval1  + interval2;
+    auto expectedTotalTime = interval1 + interval2;
 
     int count = 0;
 

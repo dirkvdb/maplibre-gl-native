@@ -4,7 +4,7 @@ endif()
 
 target_compile_definitions(
     mbgl-core
-    PUBLIC MBGL_USE_GLES2
+    PUBLIC
 )
 
 include(${PROJECT_SOURCE_DIR}/vendor/icu.cmake)
@@ -66,6 +66,7 @@ target_sources(
         ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/storage/sqlite3.cpp
         ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/text/bidi.cpp
         ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/util/compression.cpp
+        ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/util/filesystem.cpp
         ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/util/monotonic_timer.cpp
         ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/util/png_writer.cpp
         ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/util/thread_local.cpp
@@ -83,7 +84,7 @@ target_link_libraries(
     mbgl-core
     PRIVATE
         EGL
-        GLESv2
+        GLESv3
         Mapbox::Base::jni.hpp
         android
         atomic
@@ -107,7 +108,7 @@ target_include_directories(
 target_link_libraries(
     example-custom-layer
     PRIVATE
-        GLESv2
+        GLESv3
         Mapbox::Base
         Mapbox::Base::optional
         log
@@ -139,24 +140,11 @@ target_link_libraries(
         -Wl,--no-whole-archive
 )
 
-if(ANDROID_NATIVE_API_LEVEL VERSION_LESS 24)
-    target_sources(
-        mbgl-test-runner
-        PRIVATE ${PROJECT_SOURCE_DIR}/platform/android/src/test/http_file_source_test_stub.cpp
-    )
-else()
-    target_sources(
-        mbgl-test-runner
-        PRIVATE $<$<BOOL:${MBGL_PUBLIC_BUILD}>:${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/storage/http_file_source.cpp>
-    )
 
-    include(${PROJECT_SOURCE_DIR}/vendor/curl.cmake)
-
-    target_link_libraries(
-        mbgl-test-runner
-        PRIVATE mbgl-vendor-curl
-    )
-endif()
+target_sources(
+    mbgl-test-runner
+    PRIVATE ${PROJECT_SOURCE_DIR}/platform/android/MapLibreAndroid/src/cpp/http_file_source.cpp
+)
 
 add_custom_command(
     TARGET mbgl-test-runner PRE_BUILD
@@ -189,7 +177,7 @@ add_library(
     ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/text/local_glyph_rasterizer.cpp
     ${PROJECT_SOURCE_DIR}/platform/android/src/test/collator_test_stub.cpp
     ${PROJECT_SOURCE_DIR}/platform/android/src/test/number_format_test_stub.cpp
-    ${PROJECT_SOURCE_DIR}/platform/android/src/test/http_file_source_test_stub.cpp
+    ${PROJECT_SOURCE_DIR}/platform/android/MapLibreAndroid/src/cpp/http_file_source.cpp
 )
 
 target_include_directories(
@@ -238,7 +226,7 @@ add_library(
     ${PROJECT_SOURCE_DIR}/platform/default/src/mbgl/text/local_glyph_rasterizer.cpp
     ${PROJECT_SOURCE_DIR}/platform/android/src/test/collator_test_stub.cpp
     ${PROJECT_SOURCE_DIR}/platform/android/src/test/number_format_test_stub.cpp
-    ${PROJECT_SOURCE_DIR}/platform/android/src/test/http_file_source_test_stub.cpp
+    ${PROJECT_SOURCE_DIR}/platform/android/MapLibreAndroid/src/cpp/http_file_source.cpp
 )
 
 target_include_directories(

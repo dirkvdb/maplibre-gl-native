@@ -1,6 +1,7 @@
 #include <mbgl/actor/mailbox.hpp>
 #include <mbgl/actor/message.hpp>
 #include <mbgl/actor/scheduler.hpp>
+#include <mbgl/util/scoped.hpp>
 
 #include <cassert>
 
@@ -8,13 +9,14 @@ namespace mbgl {
 
 Mailbox::Mailbox() = default;
 
-Mailbox::Mailbox(Scheduler& scheduler_) : weakScheduler(scheduler_.makeWeakPtr()) {}
+Mailbox::Mailbox(Scheduler& scheduler_)
+    : weakScheduler(scheduler_.makeWeakPtr()) {}
 
 void Mailbox::open(Scheduler& scheduler_) {
     assert(!weakScheduler);
 
-    // As with close(), block until neither receive() nor push() are in progress, and acquire the two
-    // mutexes in the same order.
+    // As with close(), block until neither receive() nor push() are in
+    // progress, and acquire the two mutexes in the same order.
     std::lock_guard<std::recursive_mutex> receivingLock(receivingMutex);
     std::lock_guard<std::mutex> pushingLock(pushingMutex);
 
@@ -31,15 +33,27 @@ void Mailbox::open(Scheduler& scheduler_) {
 }
 
 void Mailbox::close() {
-    // Block until neither receive() nor push() are in progress. Two mutexes are used because receive()
-    // must not block send(). Of the two, the receiving mutex must be acquired first, because that is
-    // the order that an actor will obtain them when it self-sends a message, and consistent lock
-    // acquisition order prevents deadlocks.
-    // The receiving mutex is recursive to allow a mailbox (and thus the actor) to close itself.
+    abandon();
+
+    // Block until neither receive() nor push() are in progress. Two mutexes are
+    // used because receive() must not block send(). Of the two, the receiving
+    // mutex must be acquired first, because that is the order that an actor
+    // will obtain them when it self-sends a message, and consistent lock
+    // acquisition order prevents deadlocks. The receiving mutex is recursive to
+    // allow a mailbox (and thus the actor) to close itself.
     std::lock_guard<std::recursive_mutex> receivingLock(receivingMutex);
     std::lock_guard<std::mutex> pushingLock(pushingMutex);
 
     closed = true;
+}
+
+void Mailbox::abandon() {
+    auto idleValue = State::Idle;
+    while (!state.compare_exchange_strong(idleValue, State::Abandoned)) {
+        if (state == State::Abandoned) {
+            break;
+        }
+    }
 }
 
 bool Mailbox::isOpen() const {
@@ -47,9 +61,23 @@ bool Mailbox::isOpen() const {
 }
 
 void Mailbox::push(std::unique_ptr<Message> message) {
+    auto idleState = State::Idle;
+    while (!state.compare_exchange_strong(idleState, State::Processing)) {
+        if (state == State::Abandoned) {
+            return;
+        }
+    }
+
+    Scoped activityFlag{[this]() {
+        if (state == State::Processing) {
+            state = State::Idle;
+        }
+    }};
+
     std::lock_guard<std::mutex> pushingLock(pushingMutex);
 
     if (closed) {
+        state = State::Abandoned;
         return;
     }
 
@@ -63,12 +91,25 @@ void Mailbox::push(std::unique_ptr<Message> message) {
 }
 
 void Mailbox::receive() {
+    auto idleState = State::Idle;
+    while (!state.compare_exchange_strong(idleState, State::Processing)) {
+        if (state == State::Abandoned) {
+            return;
+        }
+    }
+
+    Scoped activityFlag{[this]() {
+        if (state == State::Processing) {
+            state = State::Idle;
+        }
+    }};
     std::lock_guard<std::recursive_mutex> receivingLock(receivingMutex);
 
     auto guard = weakScheduler.lock();
     assert(weakScheduler);
 
     if (closed) {
+        state = State::Abandoned;
         return;
     }
 
@@ -99,7 +140,9 @@ void Mailbox::maybeReceive(const std::weak_ptr<Mailbox>& mailbox) {
 
 // static
 std::function<void()> Mailbox::makeClosure(std::weak_ptr<Mailbox> mailbox) {
-    return [mailbox = std::move(mailbox)]() { maybeReceive(mailbox); };
+    return [mailbox = std::move(mailbox)]() {
+        maybeReceive(mailbox);
+    };
 }
 
 } // namespace mbgl

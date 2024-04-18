@@ -19,7 +19,7 @@ class UnwrappedTileID;
 
 using ScreenCoordinate = mapbox::geometry::point<double>;
 using ScreenLineString = mapbox::geometry::line_string<double>;
-using ScreenBox        = mapbox::geometry::box<double>;
+using ScreenBox = mapbox::geometry::box<double>;
 
 class LatLng {
 private:
@@ -27,10 +27,14 @@ private:
     double lon;
 
 public:
-    enum WrapMode : bool { Unwrapped, Wrapped };
+    enum WrapMode : bool {
+        Unwrapped,
+        Wrapped
+    };
 
     LatLng(double lat_ = 0, double lon_ = 0, WrapMode mode = Unwrapped)
-        : lat(lat_), lon(lon_) {
+        : lat(lat_),
+          lon(lon_) {
         if (std::isnan(lat)) {
             throw std::domain_error("latitude must not be NaN");
         }
@@ -48,131 +52,123 @@ public:
         }
     }
 
-    double latitude() const { return lat; }
-    double longitude() const { return lon; }
+    double latitude() const noexcept { return lat; }
+    double longitude() const noexcept { return lon; }
 
-    LatLng wrapped() const { return { lat, lon, Wrapped }; }
+    LatLng wrapped() const noexcept { return {lat, lon, Wrapped}; }
 
-    void wrap() {
-        lon = util::wrap(lon, -util::LONGITUDE_MAX, util::LONGITUDE_MAX);
-    }
+    void wrap() noexcept { lon = util::wrap(lon, -util::LONGITUDE_MAX, util::LONGITUDE_MAX); }
 
     // If the distance from start to end longitudes is between half and full
     // world, unwrap the start longitude to ensure the shortest path is taken.
-    void unwrapForShortestPath(const LatLng& end) {
+    void unwrapForShortestPath(const LatLng& end) noexcept {
         const double delta = std::abs(end.lon - lon);
         if (delta <= util::LONGITUDE_MAX || delta >= util::DEGREES_MAX) return;
-        if (lon > 0 && end.lon < 0) lon -= util::DEGREES_MAX;
-        else if (lon < 0 && end.lon > 0) lon += util::DEGREES_MAX;
+        if (lon > 0 && end.lon < 0)
+            lon -= util::DEGREES_MAX;
+        else if (lon < 0 && end.lon > 0)
+            lon += util::DEGREES_MAX;
     }
 
     // Constructs a LatLng object with the top left position of the specified tile.
-    LatLng(const CanonicalTileID& id);
-    LatLng(const UnwrappedTileID& id);
+    LatLng(const CanonicalTileID& id) noexcept;
+    LatLng(const UnwrappedTileID& id) noexcept;
 
-    friend bool operator==(const LatLng& a, const LatLng& b) {
-        return a.lat == b.lat && a.lon == b.lon;
-    }
+    friend bool operator==(const LatLng& a, const LatLng& b) noexcept { return a.lat == b.lat && a.lon == b.lon; }
 
-    friend bool operator!=(const LatLng& a, const LatLng& b) {
-        return !(a == b);
-    }
+    friend bool operator!=(const LatLng& a, const LatLng& b) noexcept { return !(a == b); }
 };
 
 class LatLngBounds {
 public:
     // Return a bounds covering the entire (unwrapped) world.
-    static LatLngBounds world() { return {{-90, -180}, {90, 180}}; }
+    static LatLngBounds world() noexcept { return {{-90, -180}, {90, 180}}; }
 
     // Return the bounds consisting of the single point.
     static LatLngBounds singleton(const LatLng& a) { return {a, a}; }
 
     // Return the convex hull of two points; the smallest bounds that contains both.
-    static LatLngBounds hull(const LatLng& a, const LatLng& b) {
+    static LatLngBounds hull(const LatLng& a, const LatLng& b) noexcept {
         LatLngBounds bounds(a, a);
         bounds.extend(b);
         return bounds;
     }
 
     // Return a bounds that may serve as the identity element for the extend operation.
-    static LatLngBounds empty() {
+    static LatLngBounds empty() noexcept {
         LatLngBounds bounds = world();
         std::swap(bounds.sw, bounds.ne);
         return bounds;
     }
 
-    /// Construct an infinite bound, a bound for which the constrain method returns its
-    /// input unmodified.
+    /// Construct an infinite bound, a bound for which the constrain method
+    /// returns its input unmodified.
     ///
-    /// Note: this is different than LatLngBounds::world() since arbitrary unwrapped
-    /// coordinates are also inside the bounds.
-    LatLngBounds() : sw({-90, -180}), ne({90, 180}), bounded(false) {}
+    /// Note: this is different than LatLngBounds::world() since arbitrary
+    /// unwrapped coordinates are also inside the bounds.
+    LatLngBounds() noexcept
+        : sw({-90, -180}),
+          ne({90, 180}),
+          bounded(false) {}
 
     // Constructs a LatLngBounds object with the tile's exact boundaries.
-    LatLngBounds(const CanonicalTileID&);
+    LatLngBounds(const CanonicalTileID&) noexcept;
 
-    bool valid() const {
-        return (sw.latitude() <= ne.latitude()) && (sw.longitude() <= ne.longitude());
+    bool valid() const noexcept { return (sw.latitude() <= ne.latitude()) && (sw.longitude() <= ne.longitude()); }
+
+    double south() const noexcept { return sw.latitude(); }
+    double west() const noexcept { return sw.longitude(); }
+    double north() const noexcept { return ne.latitude(); }
+    double east() const noexcept { return ne.longitude(); }
+
+    LatLng southwest() const noexcept { return sw; }
+    LatLng northeast() const noexcept { return ne; }
+    LatLng southeast() const noexcept { return {south(), east()}; }
+    LatLng northwest() const noexcept { return {north(), west()}; }
+
+    LatLng center() const noexcept {
+        return {(sw.latitude() + ne.latitude()) / 2, (sw.longitude() + ne.longitude()) / 2};
     }
 
-    double south() const { return sw.latitude(); }
-    double west()  const { return sw.longitude(); }
-    double north() const { return ne.latitude(); }
-    double east()  const { return ne.longitude(); }
+    LatLng constrain(const LatLng& p) const noexcept;
 
-    LatLng southwest() const { return sw; }
-    LatLng northeast() const { return ne; }
-    LatLng southeast() const { return {south(), east()}; }
-    LatLng northwest() const { return {north(), west()}; }
-
-    LatLng center() const { return {(sw.latitude() + ne.latitude()) / 2, (sw.longitude() + ne.longitude()) / 2}; }
-
-    LatLng constrain(const LatLng& p) const;
-
-    void extend(const LatLng& point) {
-        sw = LatLng(std::min(point.latitude(), sw.latitude()),
-                    std::min(point.longitude(), sw.longitude()));
-        ne = LatLng(std::max(point.latitude(), ne.latitude()),
-                    std::max(point.longitude(), ne.longitude()));
+    void extend(const LatLng& point) noexcept {
+        sw = LatLng(std::min(point.latitude(), sw.latitude()), std::min(point.longitude(), sw.longitude()));
+        ne = LatLng(std::max(point.latitude(), ne.latitude()), std::max(point.longitude(), ne.longitude()));
     }
 
-    void extend(const LatLngBounds& bounds) {
+    void extend(const LatLngBounds& bounds) noexcept {
         extend(bounds.sw);
         extend(bounds.ne);
     }
 
-    bool isEmpty() const {
-        return sw.latitude() > ne.latitude() ||
-               sw.longitude() > ne.longitude();
-    }
+    bool isEmpty() const noexcept { return sw.latitude() > ne.latitude() || sw.longitude() > ne.longitude(); }
 
-    bool crossesAntimeridian() const {
-        return (sw.wrapped().longitude() > ne.wrapped().longitude());
-    }
+    bool crossesAntimeridian() const noexcept { return (sw.wrapped().longitude() > ne.wrapped().longitude()); }
 
-    bool contains(const CanonicalTileID& tileID) const;
-    bool contains(const LatLng& point, LatLng::WrapMode wrap = LatLng::Unwrapped) const;
-    bool contains(const LatLngBounds& area, LatLng::WrapMode wrap = LatLng::Unwrapped) const;
+    bool contains(const CanonicalTileID& tileID) const noexcept;
+    bool contains(const LatLng& point, LatLng::WrapMode wrap = LatLng::Unwrapped) const noexcept;
+    bool contains(const LatLngBounds& area, LatLng::WrapMode wrap = LatLng::Unwrapped) const noexcept;
 
-    bool intersects(LatLngBounds area, LatLng::WrapMode wrap = LatLng::Unwrapped) const;
+    bool intersects(LatLngBounds area, LatLng::WrapMode wrap = LatLng::Unwrapped) const noexcept;
 
 private:
     LatLng sw;
     LatLng ne;
     bool bounded = true;
 
-    LatLngBounds(LatLng sw_, LatLng ne_) : sw(sw_), ne(ne_) {}
+    LatLngBounds(LatLng sw_, LatLng ne_) noexcept
+        : sw(sw_),
+          ne(ne_) {}
 
-    bool containsLatitude(double latitude) const;
-    bool containsLongitude(double longitude, LatLng::WrapMode wrap) const;
+    bool containsLatitude(double latitude) const noexcept;
+    bool containsLongitude(double longitude, LatLng::WrapMode wrap) const noexcept;
 
     friend bool operator==(const LatLngBounds& a, const LatLngBounds& b) {
         return (!a.bounded && !b.bounded) || (a.bounded && b.bounded && a.sw == b.sw && a.ne == b.ne);
     }
 
-    friend bool operator!=(const LatLngBounds& a, const LatLngBounds& b) {
-        return !(a == b);
-    }
+    friend bool operator!=(const LatLngBounds& a, const LatLngBounds& b) { return !(a == b); }
 };
 
 // Determines the orientation of the map.
@@ -193,7 +189,10 @@ private:
 
 public:
     EdgeInsets(double t_ = 0, double l_ = 0, double b_ = 0, double r_ = 0)
-        : _top(t_), _left(l_), _bottom(b_), _right(r_) {
+        : _top(t_),
+          _left(l_),
+          _bottom(b_),
+          _right(r_) {
         if (std::isnan(_top)) {
             throw std::domain_error("top must not be NaN");
         }
@@ -208,14 +207,12 @@ public:
         }
     }
 
-    double top() const { return _top; }
-    double left() const { return _left; }
-    double bottom() const { return _bottom; }
-    double right() const { return _right; }
+    double top() const noexcept { return _top; }
+    double left() const noexcept { return _left; }
+    double bottom() const noexcept { return _bottom; }
+    double right() const noexcept { return _right; }
 
-    bool isFlush() const {
-        return _top == 0 && _left == 0 && _bottom == 0 && _right == 0;
-    }
+    bool isFlush() const noexcept { return _top == 0 && _left == 0 && _bottom == 0 && _right == 0; }
 
     void operator+=(const EdgeInsets& o) {
         _top += o._top;
@@ -224,21 +221,22 @@ public:
         _right += o._right;
     }
 
-    EdgeInsets operator+(const EdgeInsets& o) const {
+    EdgeInsets operator+(const EdgeInsets& o) const noexcept {
         return {
-            _top + o._top, _left + o._left, _bottom + o._bottom, _right + o._right,
+            _top + o._top,
+            _left + o._left,
+            _bottom + o._bottom,
+            _right + o._right,
         };
     }
 
-    ScreenCoordinate getCenter(uint16_t width, uint16_t height) const;
+    ScreenCoordinate getCenter(uint16_t width, uint16_t height) const noexcept;
 
-    friend bool operator==(const EdgeInsets& a, const EdgeInsets& b) {
+    friend bool operator==(const EdgeInsets& a, const EdgeInsets& b) noexcept {
         return a._top == b._top && a._left == b._left && a._bottom == b._bottom && a._right == b._right;
     }
 
-    friend bool operator!=(const EdgeInsets& a, const EdgeInsets& b) {
-        return !(a == b);
-    }
+    friend bool operator!=(const EdgeInsets& a, const EdgeInsets& b) noexcept { return !(a == b); }
 };
 
 struct LatLngAltitude {

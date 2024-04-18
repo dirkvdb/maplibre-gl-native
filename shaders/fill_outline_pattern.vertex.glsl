@@ -4,15 +4,15 @@ uniform vec2 u_pixel_coord_upper;
 uniform vec2 u_pixel_coord_lower;
 uniform vec4 u_scale;
 
-attribute vec2 a_pos;
+layout (location = 0) in vec2 a_pos;
 
-varying vec2 v_pos_a;
-varying vec2 v_pos_b;
-varying vec2 v_pos;
+out vec2 v_pos_a;
+out vec2 v_pos_b;
+out vec2 v_pos;
 
 #pragma mapbox: define lowp float opacity
-#pragma mapbox: define lowp vec4 pattern_from
-#pragma mapbox: define lowp vec4 pattern_to
+#pragma mapbox: define mediump vec4 pattern_from
+#pragma mapbox: define mediump vec4 pattern_to
 
 void main() {
     #pragma mapbox: initialize lowp float opacity

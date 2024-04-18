@@ -26,7 +26,7 @@ std::string replaceTokens(const std::string &source, const Lookup &lookup) {
         if (pos != end) {
             for (brace++; brace != end && tokenReservedChars.find(*brace) == std::string::npos; brace++);
             if (brace != end && *brace == '}') {
-                std::string key { pos + 1, brace };
+                std::string key{pos + 1, brace};
                 if (std::optional<std::string> replacement = lookup(key)) {
                     result.append(*replacement);
                 } else {

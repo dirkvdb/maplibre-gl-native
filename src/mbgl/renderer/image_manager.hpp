@@ -4,6 +4,7 @@
 #include <mbgl/util/immutable.hpp>
 
 #include <map>
+#include <mutex>
 #include <string>
 
 namespace mbgl {
@@ -19,7 +20,8 @@ class ImageManagerObserver;
 class ImageRequestor;
 
 /**
- * @brief tracks requests for icon images from tile workers and sends responses when the requests are fulfilled.
+ * @brief tracks requests for icon images from tile workers and sends responses
+ * when the requests are fulfilled.
  */
 class ImageManager {
 public:
@@ -47,7 +49,7 @@ public:
     void notifyIfMissingImageAdded();
     void reduceMemoryUse();
     void reduceMemoryUseIfCacheSizeExceedsLimit();
-    const std::set<std::string>& getAvailableImages() const;
+    std::set<std::string> getAvailableImages() const;
 
     ImageVersionMap updatedImageVersions;
 
@@ -56,7 +58,6 @@ public:
 private:
     void checkMissingAndNotify(ImageRequestor&, const ImageRequestPair&);
     void notify(ImageRequestor&, const ImageRequestPair&) const;
-    void removePattern(const std::string&);
 
     bool loaded = false;
 
@@ -69,13 +70,18 @@ private:
     std::set<std::string> availableImages;
 
     ImageManagerObserver* observer = nullptr;
+
+    mutable std::recursive_mutex rwLock;
 };
 
 class ImageRequestor {
 public:
-    explicit ImageRequestor(ImageManager&);
+    explicit ImageRequestor(std::shared_ptr<ImageManager>);
     virtual ~ImageRequestor();
-    virtual void onImagesAvailable(ImageMap icons, ImageMap patterns, ImageVersionMap versionMap, uint64_t imageCorrelationID) = 0;
+    virtual void onImagesAvailable(ImageMap icons,
+                                   ImageMap patterns,
+                                   ImageVersionMap versionMap,
+                                   uint64_t imageCorrelationID) = 0;
 
     void addPendingRequest(const std::string& imageId) { pendingRequests.insert(imageId); }
     bool hasPendingRequest(const std::string& imageId) const { return pendingRequests.count(imageId); }
@@ -83,7 +89,7 @@ public:
     void removePendingRequest(const std::string& imageId) { pendingRequests.erase(imageId); }
 
 private:
-    ImageManager& imageManager;
+    std::shared_ptr<ImageManager> imageManager;
 
     // Pending requests are image requests that are waiting to be dispatched to the client.
     std::set<std::string> pendingRequests;

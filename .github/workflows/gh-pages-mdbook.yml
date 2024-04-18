@@ -2,16 +2,19 @@ name: Build & Deploy mdBook documentation
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   build-docs:
     name: Build
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
-      - uses: extractions/setup-just@v1
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
       - name: Setup mdBook
-        uses: peaceiris/actions-mdbook@v1
+        uses: peaceiris/actions-mdbook@v2
       - name: Install Dependencies
         shell: bash
         run: sudo apt-get install -y libwayland-dev libxkbcommon-dev # Required for winit
@@ -19,7 +22,7 @@ jobs:
         working-directory: docs/mdbook
         shell: bash
         run: mdbook build
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: book
           path: docs/mdbook/book/
@@ -29,14 +32,14 @@ jobs:
     name: Deploy
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Download book
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: book
           path: artifacts/book
       - name: Deploy
-        uses: JamesIves/github-pages-deploy-action@v4.4.1
+        uses: JamesIves/github-pages-deploy-action@v4.5.0
         with:
           branch: gh-pages
           folder: artifacts/book

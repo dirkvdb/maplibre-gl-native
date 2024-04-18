@@ -1,5 +1,6 @@
 // Global functions //
 
+const ejs = require('ejs');
 const fs = require('fs');
 const path = require('path');
 
@@ -35,7 +36,16 @@ process.on('exit', function() {
   fs.writeFileSync(list, files.join("\n"));
 });
 
-global.writeIfModified = function(filename, newContent) {
+global.writeIfModified = function(filename, newContent, output) {
+  if (output) {
+    filename = path.resolve(path.join(output, filename));
+  }
+
+  const info = path.parse(filename);
+  if (!fs.existsSync(info.dir)) {
+    fs.mkdirSync(info.dir, {recursive: true});
+  }
+
   files.push(filename);
   try {
     const oldContent = fs.readFileSync(filename, 'utf8');
@@ -50,3 +60,11 @@ global.writeIfModified = function(filename, newContent) {
   }
   console.warn(`* Updating outdated file '${filename}'`);
 };
+
+global.readAndCompile = function(filename, root) {
+  if (root) {
+    filename = path.resolve(path.join(root, filename));
+  }
+
+  return ejs.compile(fs.readFileSync(filename, 'utf8'), {strict: true});
+}

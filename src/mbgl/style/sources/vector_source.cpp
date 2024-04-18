@@ -14,7 +14,9 @@
 namespace mbgl {
 namespace style {
 
-VectorSource::VectorSource(std::string id, variant<std::string, Tileset> urlOrTileset_, std::optional<float> maxZoom_,
+VectorSource::VectorSource(std::string id,
+                           variant<std::string, Tileset> urlOrTileset_,
+                           std::optional<float> maxZoom_,
                            std::optional<float> minZoom_)
     : Source(makeMutable<Impl>(std::move(id))),
       urlOrTileset(std::move(urlOrTileset_)),
@@ -53,7 +55,7 @@ void VectorSource::loadDescription(FileSource& fileSource) {
 
     const auto& rawURL = urlOrTileset.get<std::string>();
     const auto& url = util::mapbox::canonicalizeSourceURL(fileSource.getResourceOptions().tileServerOptions(), rawURL);
-    
+
     req = fileSource.request(Resource::source(url), [this, url, &fileSource](const Response& res) {
         if (res.error) {
             observer->onSourceError(*this, std::make_exception_ptr(std::runtime_error(res.error->message)));
@@ -88,6 +90,25 @@ void VectorSource::loadDescription(FileSource& fileSource) {
             }
         }
     });
+}
+
+const std::vector<std::string> VectorSource::getTiles() const {
+    auto tileset = impl().tileset;
+    if (tileset.has_value()) {
+        return tileset->tiles;
+    } else {
+        return {};
+    }
+}
+
+void VectorSource::setTiles(const std::vector<std::string>& tiles) {
+    auto& tileset = impl().tileset;
+    if (!tileset.has_value()) return;
+    if (tileset->tiles == tiles) return;
+    Tileset newtileset(*tileset);
+    newtileset.tiles = tiles;
+    baseImpl = makeMutable<Impl>(impl(), newtileset);
+    observer->onSourceChanged(*this);
 }
 
 bool VectorSource::supportsLayerType(const mbgl::style::LayerTypeInfo* info) const {

@@ -11,7 +11,7 @@ protected:
     ThreadLocalBase();
     ~ThreadLocalBase();
 
-    void* get();
+    void* get() const;
     void set(void*);
 
 private:
@@ -25,17 +25,11 @@ class ThreadLocal : public impl::ThreadLocalBase {
 public:
     ThreadLocal() = default;
 
-    ThreadLocal(T* val) {
-        set(val);
-    }
+    ThreadLocal(T* val) { set(val); }
 
-    T* get() {
-        return reinterpret_cast<T*>(impl::ThreadLocalBase::get());
-    }
+    T* get() const { return reinterpret_cast<T*>(impl::ThreadLocalBase::get()); }
 
-    void set(T* ptr) {
-        impl::ThreadLocalBase::set(ptr);
-    }
+    void set(T* ptr) { impl::ThreadLocalBase::set(ptr); }
 };
 
 } // namespace util

@@ -52,12 +52,16 @@ if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
 endif()
 
 # Needed for testing private classes
-get_target_property(MBGL_CORE_PRIVATE_LIBRARIES mbgl-core LINK_LIBRARIES)
+get_target_property(MLN_CORE_PRIVATE_LIBRARIES mbgl-core LINK_LIBRARIES)
 
 target_link_libraries(
     mbgl-benchmark
-    PRIVATE ${MBGL_CORE_PRIVATE_LIBRARIES} mbgl-vendor-benchmark mbgl-compiler-options
+    PRIVATE ${MLN_CORE_PRIVATE_LIBRARIES} mbgl-vendor-benchmark mbgl-compiler-options
     PUBLIC mbgl-core
 )
 
 set_property(TARGET mbgl-benchmark PROPERTY FOLDER Core)
+
+if(MLN_WITH_OPENGL)
+    target_compile_definitions(mbgl-benchmark PRIVATE "MLN_RENDER_BACKEND_OPENGL=1")
+endif()

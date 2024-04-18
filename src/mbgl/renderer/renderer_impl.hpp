@@ -2,6 +2,11 @@
 
 #include <mbgl/renderer/render_orchestrator.hpp>
 
+#if MLN_RENDER_BACKEND_METAL
+#include <mbgl/mtl/mtl_fwd.hpp>
+#include <Foundation/Foundation.hpp>
+#endif // MLN_RENDER_BACKEND_METAL
+
 #include <memory>
 #include <string>
 
@@ -23,10 +28,10 @@ public:
 
 private:
     friend class Renderer;
- 
+
     void setObserver(RendererObserver*);
 
-    void render(const RenderTree&);
+    void render(const RenderTree&, const std::shared_ptr<UpdateParameters>&);
 
     void reduceMemoryUse();
 
@@ -47,6 +52,12 @@ private:
     };
 
     RenderState renderState = RenderState::Never;
+
+    uint64_t frameCount = 0;
+
+#if MLN_RENDER_BACKEND_METAL
+    mtl::MTLCaptureScopePtr commandCaptureScope;
+#endif // MLN_RENDER_BACKEND_METAL
 };
 
 } // namespace mbgl

@@ -1,55 +1,50 @@
 #include <mbgl/gfx/shader_registry.hpp>
-#include <mbgl/gfx/shader.hpp>
+#include <mbgl/gfx/shader_group.hpp>
 
 namespace mbgl {
 namespace gfx {
 
-ShaderRegistry::ShaderRegistry() {}
+ShaderRegistry::ShaderRegistry()
+    : legacyGroup() {}
 
-bool ShaderRegistry::isShader(const std::string& shaderName)
-    const noexcept
-{
-    std::shared_lock<std::shared_mutex> readerLock(programLock);
-    return programs.find(shaderName) != programs.end();
+ShaderGroup& ShaderRegistry::getLegacyGroup() noexcept {
+    return legacyGroup;
 }
 
-const std::shared_ptr<gfx::Shader> ShaderRegistry::getShader(const std::string& shaderName)
-    const noexcept
-{
-    std::shared_lock<std::shared_mutex> readerLock(programLock);
-    const auto it = programs.find(shaderName);
-    if (it == programs.end()) {
+bool ShaderRegistry::isShaderGroup(const std::string& shaderGroupName) const noexcept {
+    std::shared_lock<std::shared_mutex> readerLock(shaderGroupLock);
+    return shaderGroups.find(shaderGroupName) != shaderGroups.end();
+}
+
+const ShaderGroupPtr ShaderRegistry::getShaderGroup(const std::string& shaderGroupName) const noexcept {
+    std::shared_lock<std::shared_mutex> readerLock(shaderGroupLock);
+    const auto it = shaderGroups.find(shaderGroupName);
+    if (it == shaderGroups.end()) {
         return nullptr;
     }
 
     return it->second;
 }
 
-bool ShaderRegistry::replaceShader(
-    std::shared_ptr<gfx::Shader>&& shader) noexcept
-{
-    std::unique_lock<std::shared_mutex> writerLock(programLock);
-    const std::string programName{shader->name()}; // TODO: C++ 20 heterogenous lookup
-    if (programs.find(programName) == programs.end()) {
+bool ShaderRegistry::replaceShader(ShaderGroupPtr&& shader, const std::string& shaderGroupName) noexcept {
+    std::unique_lock<std::shared_mutex> writerLock(shaderGroupLock);
+    if (shaderGroups.find(shaderGroupName) == shaderGroups.end()) {
         return false;
     }
 
-    programs[programName] = std::move(shader);
+    shaderGroups[shaderGroupName] = std::move(shader);
     return true;
 }
 
-bool ShaderRegistry::registerShader(
-    std::shared_ptr<gfx::Shader>&& shader) noexcept
-{
-    std::unique_lock<std::shared_mutex> writerLock(programLock);
-    const std::string programName{shader->name()};
-    if (programs.find(programName) != programs.end()) {
+bool ShaderRegistry::registerShaderGroup(ShaderGroupPtr&& shader, const std::string& shaderGroupName) noexcept {
+    std::unique_lock<std::shared_mutex> writerLock(shaderGroupLock);
+    if (shaderGroups.find(shaderGroupName) != shaderGroups.end()) {
         return false;
     }
 
-    programs.emplace(programName, std::move(shader));
+    shaderGroups.emplace(shaderGroupName, std::move(shader));
     return true;
 }
 
-} // namespace gl
+} // namespace gfx
 } // namespace mbgl

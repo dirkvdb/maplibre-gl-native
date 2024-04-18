@@ -1,5 +1,10 @@
 #pragma once
 
+#include <mbgl/gfx/texture.hpp>
+#include <mbgl/gfx/draw_mode.hpp>
+#include <mbgl/gfx/depth_mode.hpp>
+#include <mbgl/gfx/stencil_mode.hpp>
+#include <mbgl/gfx/color_mode.hpp>
 #include <mbgl/gfx/context.hpp>
 #include <mbgl/gl/object.hpp>
 #include <mbgl/gl/state.hpp>
@@ -7,20 +12,18 @@
 #include <mbgl/gl/framebuffer.hpp>
 #include <mbgl/gl/vertex_array.hpp>
 #include <mbgl/gl/types.hpp>
-#include <mbgl/gfx/texture.hpp>
-#include <mbgl/gfx/draw_mode.hpp>
-#include <mbgl/gfx/depth_mode.hpp>
-#include <mbgl/gfx/stencil_mode.hpp>
-#include <mbgl/gfx/color_mode.hpp>
 #include <mbgl/platform/gl_functions.hpp>
 #include <mbgl/util/noncopyable.hpp>
 
+#if MLN_DRAWABLE_RENDERER
+#include <mbgl/gl/fence.hpp>
+#include <mbgl/gl/buffer_allocator.hpp>
+#include <mbgl/gfx/texture2d.hpp>
+#endif
 
-#include <functional>
-#include <memory>
-#include <vector>
 #include <array>
-#include <string>
+#include <functional>
+#include <vector>
 
 namespace mbgl {
 namespace gl {
@@ -43,8 +46,8 @@ public:
 
     std::unique_ptr<gfx::CommandEncoder> createCommandEncoder() override;
 
-    gfx::RenderingStats& renderingStats();
-    const gfx::RenderingStats& renderingStats() const override;
+    void beginFrame() override;
+    void endFrame() override;
 
     void initializeExtensions(const std::function<gl::ProcAddress(const char*)>&);
 
@@ -62,40 +65,30 @@ public:
     Framebuffer createFramebuffer(const gfx::Texture&,
                                   const gfx::Renderbuffer<gfx::RenderbufferPixelType::DepthStencil>&);
     Framebuffer createFramebuffer(const gfx::Texture&);
-    Framebuffer createFramebuffer(const gfx::Texture&,
-                                  const gfx::Renderbuffer<gfx::RenderbufferPixelType::Depth>&);
+    Framebuffer createFramebuffer(const gfx::Texture&, const gfx::Renderbuffer<gfx::RenderbufferPixelType::Depth>&);
 
     template <typename Image,
               gfx::TexturePixelType format = Image::channels == 4 ? gfx::TexturePixelType::RGBA
-                                                          : gfx::TexturePixelType::Alpha>
+                                                                  : gfx::TexturePixelType::Alpha>
     Image readFramebuffer(const Size size, bool flip = true) {
-        static_assert(Image::channels == (format == gfx::TexturePixelType::RGBA ? 4 : 1),
-                      "image format mismatch");
-        return { size, readFramebuffer(size, format, flip) };
+        static_assert(Image::channels == (format == gfx::TexturePixelType::RGBA ? 4 : 1), "image format mismatch");
+        return {size, readFramebuffer(size, format, flip)};
     }
 
-#if !MBGL_USE_GLES2
-    template <typename Image>
-    void drawPixels(const Image& image) {
-        auto format = image.channels == 4 ? gfx::TexturePixelType::RGBA : gfx::TexturePixelType::Alpha;
-        drawPixels(image.size, image.data.get(), format);
-    }
-#endif // MBGL_USE_GLES2
-
-    void clear(std::optional<mbgl::Color> color,
-               std::optional<float> depth,
-               std::optional<int32_t> stencil);
+    void clear(std::optional<mbgl::Color> color, std::optional<float> depth, std::optional<int32_t> stencil);
 
     void setDepthMode(const gfx::DepthMode&);
     void setStencilMode(const gfx::StencilMode&);
     void setColorMode(const gfx::ColorMode&);
     void setCullFaceMode(const gfx::CullFaceMode&);
 
-    void draw(const gfx::DrawMode&,
-              std::size_t indexOffset,
-              std::size_t indexLength);
+    void draw(const gfx::DrawMode&, std::size_t indexOffset, std::size_t indexLength);
 
     void finish();
+
+#if MLN_DRAWABLE_RENDERER
+    std::shared_ptr<gl::Fence> getCurrentFrameFence() const;
+#endif
 
     // Actually remove the objects we marked as abandoned with the above methods.
     // Only call this while the OpenGL context is exclusive to this thread.
@@ -108,65 +101,77 @@ public:
     void reset();
 
     bool empty() const {
-        return pooledTextures.empty()
-            && abandonedPrograms.empty()
-            && abandonedShaders.empty()
-            && abandonedBuffers.empty()
-            && abandonedTextures.empty()
-            && abandonedVertexArrays.empty()
-            && abandonedFramebuffers.empty();
+        return pooledTextures.empty() && abandonedPrograms.empty() && abandonedShaders.empty() &&
+               abandonedBuffers.empty() && abandonedTextures.empty() && abandonedVertexArrays.empty() &&
+               abandonedFramebuffers.empty();
     }
 
-    void setDirtyState();
+    extension::Debugging* getDebuggingExtension() const { return debugging.get(); }
 
-    extension::Debugging* getDebuggingExtension() const {
-        return debugging.get();
-    }
+    void setCleanupOnDestruction(bool cleanup) { cleanupOnDestruction = cleanup; }
 
-    extension::VertexArray* getVertexArrayExtension() const {
-        return vertexArray.get();
-    }
+#if MLN_DRAWABLE_RENDERER
+    gfx::UniqueDrawableBuilder createDrawableBuilder(std::string name) override;
+    gfx::UniformBufferPtr createUniformBuffer(const void* data, std::size_t size, bool persistent) override;
 
-    void setCleanupOnDestruction(bool cleanup) {
-        cleanupOnDestruction = cleanup;
-    }
+    gfx::ShaderProgramBasePtr getGenericShader(gfx::ShaderRegistry&, const std::string& name) override;
+
+    TileLayerGroupPtr createTileLayerGroup(int32_t layerIndex, std::size_t initialCapacity, std::string name) override;
+
+    LayerGroupPtr createLayerGroup(int32_t layerIndex, std::size_t initialCapacity, std::string name) override;
+
+    gfx::Texture2DPtr createTexture2D() override;
+
+    RenderTargetPtr createRenderTarget(const Size size, const gfx::TextureChannelDataType type) override;
+
+    Framebuffer createFramebuffer(const gfx::Texture2D& color);
+
+    gfx::VertexAttributeArrayPtr createVertexAttributeArray() const override;
+
+    void resetState(gfx::DepthMode depthMode, gfx::ColorMode colorMode) override;
+
+    bool emplaceOrUpdateUniformBuffer(gfx::UniformBufferPtr&,
+                                      const void* data,
+                                      std::size_t size,
+                                      bool persistent) override;
+#endif
+
+    void setDirtyState() override;
 
 private:
     RendererBackend& backend;
     bool cleanupOnDestruction = true;
 
-    gfx::RenderingStats stats;
     std::unique_ptr<extension::Debugging> debugging;
-    std::unique_ptr<extension::VertexArray> vertexArray;
+#if MLN_DRAWABLE_RENDERER
+    std::shared_ptr<gl::Fence> frameInFlightFence;
+    std::unique_ptr<gl::UniformBufferAllocator> uboAllocator;
+    size_t frameNum = 0;
+#endif
 
 public:
     State<value::ActiveTextureUnit> activeTextureUnit;
     State<value::BindFramebuffer> bindFramebuffer;
     State<value::Viewport> viewport;
     State<value::ScissorTest> scissorTest;
-    std::array<State<value::BindTexture>, 2> texture;
+    std::array<State<value::BindTexture>, gfx::MaxActiveTextureUnits> texture;
     State<value::Program> program;
     State<value::BindVertexBuffer> vertexBuffer;
 
-    State<value::BindVertexArray, const Context&> bindVertexArray { *this };
-    VertexArrayState globalVertexArrayState { UniqueVertexArray(0, { const_cast<Context*>(this) }) };
+    State<value::BindVertexArray> bindVertexArray;
+    VertexArrayState globalVertexArrayState{UniqueVertexArray(0, {const_cast<Context*>(this)})};
 
     State<value::PixelStorePack> pixelStorePack;
     State<value::PixelStoreUnpack> pixelStoreUnpack;
-
-#if !MBGL_USE_GLES2
-    State<value::PixelZoom> pixelZoom;
-    State<value::RasterPos> rasterPos;
-    State<value::PixelTransferDepth> pixelTransferDepth;
-    State<value::PixelTransferStencil> pixelTransferStencil;
-#endif // MBGL_USE_GLES2
 
 private:
     State<value::StencilFunc> stencilFunc;
     State<value::StencilMask> stencilMask;
     State<value::StencilTest> stencilTest;
     State<value::StencilOp> stencilOp;
+#if MLN_RENDER_BACKEND_OPENGL
     State<value::DepthRange> depthRange;
+#endif
     State<value::DepthMask> depthMask;
     State<value::DepthTest> depthTest;
     State<value::DepthFunc> depthFunc;
@@ -183,28 +188,26 @@ private:
     State<value::CullFace> cullFace;
     State<value::CullFaceSide> cullFaceSide;
     State<value::CullFaceWinding> cullFaceWinding;
-#if !MBGL_USE_GLES2
-    State<value::PointSize> pointSize;
-#endif // MBGL_USE_GLES2
 
+public:
     std::unique_ptr<gfx::OffscreenTexture> createOffscreenTexture(Size, gfx::TextureChannelDataType) override;
+    std::unique_ptr<gfx::TextureResource> createTextureResource(Size,
+                                                                gfx::TexturePixelType,
+                                                                gfx::TextureChannelDataType) override;
 
-    std::unique_ptr<gfx::TextureResource>
-        createTextureResource(Size, gfx::TexturePixelType, gfx::TextureChannelDataType) override;
-
-    std::unique_ptr<gfx::RenderbufferResource> createRenderbufferResource(gfx::RenderbufferPixelType, Size size) override;
+private:
+    std::unique_ptr<gfx::RenderbufferResource> createRenderbufferResource(gfx::RenderbufferPixelType,
+                                                                          Size size) override;
 
     std::unique_ptr<gfx::DrawScopeResource> createDrawScopeResource() override;
 
     UniqueFramebuffer createFramebuffer();
     std::unique_ptr<uint8_t[]> readFramebuffer(Size, gfx::TexturePixelType, bool flip);
-#if !MBGL_USE_GLES2
-    void drawPixels(Size size, const void* data, gfx::TexturePixelType);
-#endif // MBGL_USE_GLES2
 
+public:
     VertexArray createVertexArray();
-    bool supportsVertexArrays() const;
 
+private:
     friend detail::ProgramDeleter;
     friend detail::ShaderDeleter;
     friend detail::BufferDeleter;
@@ -224,9 +227,6 @@ private:
     std::vector<RenderbufferID> abandonedRenderbuffers;
 
 public:
-    // For testing
-    bool disableVAOExtension = false;
-
 #if !defined(NDEBUG)
 public:
     void visualizeStencilBuffer() override;
