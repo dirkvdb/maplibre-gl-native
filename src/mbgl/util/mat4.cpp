@@ -410,7 +410,7 @@ void transformMat4(vec4& out, const vec4& a, const mat4& m) {
 void diffsplit(matf4& outValue, matf4& outDiff, const mat4& source) {
     for (auto i = 0; i < 16; ++i) {
         outValue[i] = static_cast<float>(source[i]);
-        outDiff[i] = source[i] - outValue[i];
+        outDiff[i] = static_cast<float>(source[i] - outValue[i]);
     }
 }
 
