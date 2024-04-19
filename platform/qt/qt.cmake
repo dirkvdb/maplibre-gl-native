@@ -132,9 +132,9 @@ endif()
 target_link_libraries(
     mbgl-core
     PUBLIC
-        $<BUILD_INTERFACE:mbgl-vendor-parsedate>
-        $<BUILD_INTERFACE:mbgl-vendor-nunicode>
-        $<BUILD_INTERFACE:mbgl-vendor-csscolorparser>
+        mbgl-vendor-parsedate
+        mbgl-vendor-nunicode
+        mbgl-vendor-csscolorparser
         $<$<NOT:$<OR:$<PLATFORM_ID:Windows>,$<PLATFORM_ID:Emscripten>>>:z>
         $<IF:$<BOOL:${MLN_QT_WITH_INTERNAL_SQLITE}>,unofficial::sqlite3::sqlite3,Qt${QT_VERSION_MAJOR}::Sql>
     PRIVATE
@@ -158,7 +158,6 @@ if(MLN_QT_HAS_PARENT)
     set(MLN_QT_VENDOR_LIBRARIES
         mbgl-vendor-parsedate
         mbgl-vendor-nunicode
-        mbgl-vendor-csscolorparser
         $<$<BOOL:${MLN_QT_WITH_INTERNAL_SQLITE}>:$<BUILD_INTERFACE:mbgl-vendor-sqlite>>
         $<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${MLN_QT_WITH_INTERNAL_ICU}>>:$<BUILD_INTERFACE:mbgl-vendor-icu>>
         PARENT_SCOPE
