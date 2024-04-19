@@ -41,7 +41,7 @@ if(NOT MLN_QT_WITH_INTERNAL_SQLITE)
     find_package(Qt${QT_VERSION_MAJOR}Sql REQUIRED)
 else()
     message(STATUS "Using internal sqlite")
-    include(${PROJECT_SOURCE_DIR}/vendor/sqlite.cmake)
+    find_package(unofficial-sqlite3 CONFIG REQUIRED)
 endif()
 
 # Debugging & ccache on Windows
@@ -136,7 +136,7 @@ target_link_libraries(
         $<BUILD_INTERFACE:mbgl-vendor-nunicode>
         $<BUILD_INTERFACE:mbgl-vendor-csscolorparser>
         $<$<NOT:$<OR:$<PLATFORM_ID:Windows>,$<PLATFORM_ID:Emscripten>>>:z>
-        $<IF:$<BOOL:${MLN_QT_WITH_INTERNAL_SQLITE}>,$<BUILD_INTERFACE:mbgl-vendor-sqlite>,Qt${QT_VERSION_MAJOR}::Sql>
+        $<IF:$<BOOL:${MLN_QT_WITH_INTERNAL_SQLITE}>,unofficial::sqlite3::sqlite3,Qt${QT_VERSION_MAJOR}::Sql>
     PRIVATE
         $<$<PLATFORM_ID:Linux>:${CMAKE_THREAD_LIBS_INIT}>
         Qt${QT_VERSION_MAJOR}::Core
