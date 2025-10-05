@@ -223,6 +223,8 @@ endif()
 # FIXME: Because of rapidjson conversion
 target_include_directories(
     qmaplibregl
+    PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/platform/default/include>
     PRIVATE
         ${PROJECT_SOURCE_DIR}/src
         ${PROJECT_SOURCE_DIR}/platform/qt/include
