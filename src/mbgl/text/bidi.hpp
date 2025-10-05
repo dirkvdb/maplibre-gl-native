@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <cstdint>
 
 #include <mbgl/util/noncopyable.hpp>
 

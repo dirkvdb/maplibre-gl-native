@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <cstdint>
 #include <mbgl/util/tile_server_options.hpp>
 
 namespace mbgl {
