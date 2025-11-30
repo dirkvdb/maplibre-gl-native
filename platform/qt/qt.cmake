@@ -29,7 +29,11 @@ endif()
 if(NOT MLN_QT_WITH_INTERNAL_SQLITE)
     find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Sql REQUIRED)
 else()
-    find_package(unofficial-sqlite3 CONFIG REQUIRED)
+    if (DEFINED VCPKG_TARGET_TRIPLET)
+        find_package(unofficial-sqlite3 CONFIG REQUIRED)
+    else ()
+        find_package(SQLite3 MODULE REQUIRED)
+    endif()
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -37,10 +41,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     option(MLN_QT_WITH_INTERNAL_ICU "Build MapLibre GL Qt bindings with internal ICU" OFF)
     if(NOT MLN_QT_WITH_INTERNAL_ICU)
-       find_package(ICU COMPONENTS uc REQUIRED)
+        find_package(ICU COMPONENTS uc REQUIRED)
     else()
-       message(STATUS "Using internal ICU")
-       include(${PROJECT_SOURCE_DIR}/vendor/icu.cmake)
+        message(STATUS "Using internal ICU")
+        include(${PROJECT_SOURCE_DIR}/vendor/icu.cmake)
     endif()
 endif()
 
@@ -141,7 +145,8 @@ target_link_libraries(
         Qt${QT_VERSION_MAJOR}::Core
         Qt${QT_VERSION_MAJOR}::Gui
         Qt${QT_VERSION_MAJOR}::Network
-        $<IF:$<BOOL:${MLN_QT_WITH_INTERNAL_SQLITE}>,unofficial::sqlite3::sqlite3,Qt${QT_VERSION_MAJOR}::Sql>
+        $<TARGET_NAME_IF_EXISTS:unofficial::sqlite3::sqlite3>
+        $<TARGET_NAME_IF_EXISTS:sqlite::SQLite3>
         $<$<PLATFORM_ID:Linux>:$<IF:$<BOOL:${MLN_QT_WITH_INTERNAL_ICU}>,mbgl-vendor-icu,ICU::uc>>
         mbgl-vendor-nunicode
 )
