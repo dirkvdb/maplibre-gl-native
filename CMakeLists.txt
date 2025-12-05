@@ -19,8 +19,8 @@ if (MLN_WITH_CLANG_TIDY)
     else()
         message(STATUS "Found clang-tidy at ${CLANG_TIDY_COMMAND}")
     endif()
-    # TODO: there are options which are only available on GCC(e.g. -Werror=maybe-uninitialized), 
-    # that's why we need to disable this `unknown-warning-option` here. 
+    # TODO: there are options which are only available on GCC(e.g. -Werror=maybe-uninitialized),
+    # that's why we need to disable this `unknown-warning-option` here.
     # We could check if current compiler supports particular flag before enabling it.
     set(CLANG_TIDY_COMMAND "${CLANG_TIDY_COMMAND};--extra-arg=-Wno-error=unknown-warning-option")
 endif()
@@ -44,7 +44,7 @@ set(
 )
 
 if(MBGL_OPTIONAL)
-include(CTest)
+    include(CTest)
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -57,6 +57,7 @@ add_library(
 
 set(UBSAN_BLACKLIST ${PROJECT_SOURCE_DIR}/scripts/ubsan.blacklist)
 
+target_compile_definitions(mbgl-compiler-options INTERFACE $<$<AND:$<PLATFORM_ID:Darwin>,$<CXX_COMPILER_ID:Clang,AppleClang>>:-D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION=1>)
 target_compile_options(
     mbgl-compiler-options
     INTERFACE
@@ -862,7 +863,7 @@ list(APPEND SRC_FILES
     ${PROJECT_SOURCE_DIR}/src/mbgl/util/tile_cover_impl.cpp
     ${PROJECT_SOURCE_DIR}/src/mbgl/util/tile_cover_impl.hpp
     ${PROJECT_SOURCE_DIR}/src/mbgl/util/tile_range.hpp
-    ${PROJECT_SOURCE_DIR}/src/mbgl/util/default_style.cpp    
+    ${PROJECT_SOURCE_DIR}/src/mbgl/util/default_style.cpp
     ${PROJECT_SOURCE_DIR}/src/mbgl/util/tile_server_options.cpp
     ${PROJECT_SOURCE_DIR}/src/mbgl/util/tiny_sdf.cpp
     ${PROJECT_SOURCE_DIR}/src/mbgl/util/tiny_sdf.hpp
@@ -881,7 +882,7 @@ if(MLN_WITH_OPENGL)
         mbgl-core
         PRIVATE MBGL_RENDER_BACKEND_OPENGL=1
     )
-    list(APPEND 
+    list(APPEND
         INCLUDE_FILES
             ${PROJECT_SOURCE_DIR}/include/mbgl/gfx/backend.hpp
             ${PROJECT_SOURCE_DIR}/include/mbgl/gl/custom_layer.hpp
@@ -921,7 +922,7 @@ if(MLN_WITH_OPENGL)
             ${PROJECT_SOURCE_DIR}/include/mbgl/shaders/gl/symbol_sdf_icon.hpp
             ${PROJECT_SOURCE_DIR}/include/mbgl/shaders/gl/symbol_text_and_icon.hpp
     )
-    list(APPEND 
+    list(APPEND
         SRC_FILES
             ${PROJECT_SOURCE_DIR}/src/mbgl/gl/attribute.cpp
             ${PROJECT_SOURCE_DIR}/src/mbgl/gl/attribute.hpp
@@ -1137,9 +1138,9 @@ else()
 endif()
 
 if(MBGL_OPTIONAL)
-add_subdirectory(${PROJECT_SOURCE_DIR}/test)
-add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark)
-add_subdirectory(${PROJECT_SOURCE_DIR}/render-test)
+    add_subdirectory(${PROJECT_SOURCE_DIR}/test)
+    add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark)
+    add_subdirectory(${PROJECT_SOURCE_DIR}/render-test)
 endif()
 
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/platform/default/include/mbgl TYPE INCLUDE)
